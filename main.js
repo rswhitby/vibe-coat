@@ -10,28 +10,14 @@ const buttons  = document.querySelectorAll("#controls button");
 const OVERLAY_ROTATE_DEG = 90;
 
 const streams = {
-  red:    document.getElementById("video-red"),
   green:  document.getElementById("video-green"),
   blue:   document.getElementById("video-blue"),
-  yellow: document.getElementById("video-yellow"),
 };
 
-/*
-// ----- VOD HLS URLs -----
-const hlsStreams = {
-  red: "https://stream.mux.com/KtpDUWnzBLkuBy6x2LNsnfGfMuL8n02EY3vwd8ySCoAQ.m3u8",
-  green: "https://stream.mux.com/J01dKLQObHWBU9ex00kK5p00OT2MHFi5sXJum1wwLWTwRg.m3u8",
-  blue: "https://stream.mux.com/rMcdMotmURzskzSV5ZI4w8x8LkIuXyalfGTWLb1DqvI.m3u8",
-  yellow: "https://stream.mux.com/qAJ01jpHaXsLFRt7NDjfOboj3pOiZ5h5SHk6pKNt51tI.m3u8",
-};
-
-*/
 // ----- LIVE HLS URLs -----
 const hlsStreams = {
-  red: "https://stream2.ovationav.com/red.m3u8",
   green: "https://stream2.ovationav.com/green.m3u8",
   blue: "https://stream2.ovationav.com/blue.m3u8",
-  yellow: "https://stream2.ovationav.com/yellow.m3u8",
 };
 
 // ----- init HLS on each overlay -----
@@ -50,7 +36,7 @@ Object.entries(streams).forEach(([color, video]) => {
 });
 
 // enabled flags + buttons
-const enabled = { red: false, green: false, blue: false, yellow: false };
+const enabled = { green: false, blue: false };
 
 buttons.forEach(btn => {
   btn.addEventListener("click", () => {
@@ -181,10 +167,8 @@ function applyChroma(srcVideo, t, rotateDeg) {
 
 // ----- thresholds (unchanged) -----
 const thresholds = {
-  red:    { hMin:340, hMax:15,  sMin:0.4, sMax:1, vMin:0.3, vMax:1 },
-  green:  { hMin:110,  hMax:170, sMin:0.4, sMax:1, vMin:0.3, vMax:1 },
+  green:  { hMin:110, hMax:170, sMin:0.4, sMax:1, vMin:0.3, vMax:1 },
   blue:   { hMin:210, hMax:240, sMin:0.4, sMax:1, vMin:0.3, vMax:1 },
-  yellow: { hMin:25,  hMax:60,  sMin:0.4, sMax:1, vMin:0.3, vMax:1 },
 };
 
 // ----- helpers -----
