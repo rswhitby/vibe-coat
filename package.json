@@ -1,0 +1,12 @@
+{
+  "name": "vibe-coat",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "relay": "node relay.js",
+    "serve": "npx serve ."
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
