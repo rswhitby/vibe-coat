@@ -10,9 +10,10 @@ Point your camera at a red, green, blue, or yellow object. Tap the matching colo
 
 - Full-screen camera viewfinder
 - Real-time chroma-key compositing (HSV-based color matching)
-- Four color channels: red, green, blue, yellow
+- Two color channels: green, blue
 - HLS video stream overlay per channel
 - Overlay rotation support for landscape sources
+- Vibe text input — sends requests to a TouchDesigner sketch via WebSocket
 - Installable PWA (works offline, add to home screen)
 
 ## Tech stack
@@ -33,10 +34,25 @@ Open in Chrome on Android or Safari on iOS and use **Add to Home Screen**. The a
 3. Hold a colored object in front of the camera — it will be replaced by the stream for that color
 4. Tap the button again to deactivate
 
+## TouchDesigner integration
+
+The vibe input sends JSON over WebSocket to a TouchDesigner sketch:
+
+```json
+{"vibe": "user text"}
+```
+
+**Setup in TD:**
+1. Add a **WebSocket DAT**
+2. Set **Server Port** to `9980`
+3. Enable the DAT — incoming vibes appear in the received data
+
+To change the WebSocket endpoint, edit `WS_URL` at the top of `main.js`.
+
 ## Development
 
 No build step — just serve the files from any static host or local server:
 
 ```bash
-npx serve .
+python -m http.server 3000
 ```

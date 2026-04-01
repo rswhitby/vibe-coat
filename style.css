@@ -22,6 +22,70 @@ body {
   z-index: 1;
 }
 
+/* ── Vibe input bar ─────────────────────────────────────────── */
+#vibe-bar {
+  position: absolute;
+  bottom: calc(4rem + env(safe-area-inset-bottom, 0px)); /* sits above toolbar */
+  left: 1rem;
+  right: 1rem;
+  z-index: 2;
+
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 999px;
+  padding: 0.4rem 0.4rem 0.4rem 1rem;
+}
+
+#vibe-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #fff;
+  font-size: 1rem;
+  caret-color: #fff;
+  min-width: 0;
+}
+
+#vibe-input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+#vibe-send {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 50%;
+  background: #fff;
+  color: #000;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: opacity 0.2s, background 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#vibe-send svg {
+  width: 18px;
+  height: 18px;
+}
+
+#vibe-send:active {
+  background: #ccc;
+}
+
+#vibe-send.disconnected {
+  opacity: 0.35;
+}
+
 /* ── Bottom toolbar ─────────────────────────────────────────── */
 #toolbar {
   position: absolute;

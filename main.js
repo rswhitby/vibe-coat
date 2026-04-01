@@ -1,5 +1,8 @@
 // main.js
 
+// ----- WebSocket config (change URL to point at your TouchDesigner sketch) -----
+const WS_URL = 'ws://localhost:9980';
+
 // ----- elements -----
 const videoCam = document.getElementById("video-cam");
 const canvas   = document.getElementById("output");
@@ -189,3 +192,41 @@ function rgbToHsv(r, g, b) {
   }
   return { h, s, v };
 }
+
+// ----- WebSocket to TouchDesigner -----
+const vibeInput = document.getElementById('vibe-input');
+const vibeSend  = document.getElementById('vibe-send');
+let ws = null;
+
+function connectWS() {
+  ws = new WebSocket(WS_URL);
+
+  ws.addEventListener('open', () => {
+    vibeSend.classList.remove('disconnected');
+  });
+
+  ws.addEventListener('close', () => {
+    vibeSend.classList.add('disconnected');
+    setTimeout(connectWS, 3000); // auto-reconnect
+  });
+
+  ws.addEventListener('error', () => {
+    ws.close(); // triggers the close handler above
+  });
+}
+
+function sendVibe(text) {
+  text = text.trim();
+  if (!text) return;
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ vibe: text }));
+  }
+  vibeInput.value = '';
+}
+
+vibeSend.addEventListener('click', () => sendVibe(vibeInput.value));
+vibeInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') sendVibe(vibeInput.value);
+});
+
+connectWS();
