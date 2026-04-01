@@ -1,37 +1,42 @@
-# Live Chroma Key Overlay Viewer
+# Vibe Coat
 
-This project is a browser-based video viewer that overlays live chroma-keyed video streams on top of a user's webcam feed. It is designed to pull in **four separate live HLS video streams** (red, green, blue, yellow) and composite them in real time using HTML5 Canvas and JavaScript.
+A Progressive Web App that uses your phone camera to detect colored objects via chroma-keying, then replaces those color regions with live video streams.
 
----
+## How it works
 
-## 🔧 How It Works
+Point your camera at a red, green, blue, or yellow object. Tap the matching color button in the toolbar — the app replaces that color in the live camera feed with a video stream, composited in real time on a canvas.
 
-- The user’s webcam is displayed in the background.
-- Each live stream is keyed by color and only visible where its corresponding color appears in the webcam feed.
-- The overlays are controlled by buttons to toggle red, green, blue, and yellow layers on/off.
-- Streams are pulled in via [HLS.js](https://github.com/video-dev/hls.js) and rendered with real-time chroma key masking.
+## Features
 
----
+- Full-screen camera viewfinder
+- Real-time chroma-key compositing (HSV-based color matching)
+- Four color channels: red, green, blue, yellow
+- HLS video stream overlay per channel
+- Overlay rotation support for landscape sources
+- Installable PWA (works offline, add to home screen)
 
-## 🖥️ Live Streams
+## Tech stack
 
-The video streams are hosted via [Mux](https://mux.com). Each stream is published using [OBS](https://obsproject.com/) or another RTMP-compatible encoder.
+- Vanilla JS / HTML / CSS — no framework
+- [hls.js](https://github.com/video-dev/hls.js/) for HLS stream playback
+- Canvas 2D API for per-pixel compositing
+- Service worker for app shell caching
 
-| Stream | OBS RTMP Config                  | HLS Playback URL                              |
-|--------|-----------------------------------|------------------------------------------------|
-| Red    | `rtmp://global-live.mux.com:5222/app`<br>Key: *stream_key_red* | `https://stream.mux.com/<playback_id_red>.m3u8` |
-| Green  | `...`                             | `https://stream.mux.com/<playback_id_green>.m3u8` |
-| Blue   | `...`                             | `https://stream.mux.com/<playback_id_blue>.m3u8` |
-| Yellow | `...`                             | `https://stream.mux.com/<playback_id_yellow>.m3u8` |
+## Install
 
-> NOTE: You'll need to configure these in `main.js` under the `hlsUrls` object.
+Open in Chrome on Android or Safari on iOS and use **Add to Home Screen**. The app shell is cached for offline launch.
 
----
+## Usage
 
-## 📦 Files
+1. Allow camera access when prompted
+2. Tap a color button to activate that chroma channel
+3. Hold a colored object in front of the camera — it will be replaced by the stream for that color
+4. Tap the button again to deactivate
 
-- `index.html` – Main frontend interface
-- `main.js` – Core JavaScript logic (HLS setup, chroma key masking, webcam, overlay control)
-- `style.css` – (optional) For custom styling
+## Development
 
----
+No build step — just serve the files from any static host or local server:
+
+```bash
+npx serve .
+```

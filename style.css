@@ -1,6 +1,6 @@
 /* style.css */
 
-/* Full‑screen reset */
+/* Full-screen reset */
 html,
 body {
   margin: 0;
@@ -11,7 +11,7 @@ body {
   overflow: hidden;
 }
 
-/* Canvas as your “screen” */
+/* Canvas fills the screen behind the toolbar */
 #output {
   position: absolute;
   top: 0;
@@ -22,56 +22,87 @@ body {
   z-index: 1;
 }
 
-/* Control buttons centered at bottom */
-#controls {
+/* ── Bottom toolbar ─────────────────────────────────────────── */
+#toolbar {
   position: absolute;
-  bottom: 1rem;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  gap: 1rem;
+  bottom: 0;
+  left: 0;
+  right: 0;
   z-index: 2;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+
+  padding: 0.75rem 1.25rem;
+  /* push above iOS home indicator / Android nav bar */
+  padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+
+  background: linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 100%);
+}
+
+/* Colour-picker buttons grouped together */
+#controls {
+  display: flex;
+  gap: 0.75rem;
 }
 
 #controls button {
   width: 48px;
   height: 48px;
-  border: none;
+  border: 3px solid transparent;
   border-radius: 50%;
   cursor: pointer;
-  opacity: 0.8;
-  transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+  opacity: 0.85;
+  transition: transform 0.15s, border-color 0.15s, opacity 0.15s;
+  /* larger tap target on mobile */
+  -webkit-tap-highlight-color: transparent;
 }
 
-#controls button:hover {
-  opacity: 1;
-  transform: scale(1.1);
+#controls button:active {
+  transform: scale(0.92);
 }
 
 #controls button.active {
-  /* box-shadow: 0 0 8px rgba(255, 255, 255, 0.6); */
-  border: 6px solid white;
+  border-color: #fff;
+  opacity: 1;
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.35);
 }
 
-/* Color‑code the buttons */
-#controls button[data-color="red"] {
-  background-color: #ff0015;
+#controls button[data-color="red"]    { background-color: #ff0015; }
+#controls button[data-color="green"]  { background-color: #3cff00; }
+#controls button[data-color="blue"]   { background-color: #0011ff; }
+#controls button[data-color="yellow"] { background-color: #fbff00; }
+
+/* Settings button */
+#btn-settings {
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+  flex-shrink: 0;
 }
 
-#controls button[data-color="green"] {
-  background-color: #3cff00;
+#btn-settings:active {
+  background: rgba(255,255,255,0.3);
 }
 
-#controls button[data-color="blue"] {
-  background-color: #0011ff;
+#btn-settings svg {
+  width: 22px;
+  height: 22px;
 }
 
-#controls button[data-color="yellow"] {
-  background-color: #fbff00;
-}
-
-
-/* Keep overlay videos playing, but hide them off-screen */
+/* Keep overlay videos invisible but decoded */
 #video-red,
 #video-green,
 #video-blue,
@@ -82,16 +113,5 @@ body {
   width: 1px;
   height: 1px;
   opacity: 0;
-  /* invisible but still decoded */
   pointer-events: none;
-}
-
-/* Keep the camera <video> playing, but invisible */
-#video-cam {
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  width: 1px;
-  height: 1px;
-  z-index: -1;
 }
