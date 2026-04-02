@@ -61,15 +61,38 @@ Phone UI  →  wss://vibe-coat-production.up.railway.app  →  TouchDesigner (lo
 
 ### TouchDesigner setup
 
-TD runs locally and connects outbound to the cloud relay — no port forwarding needed.
+TD runs locally and connects outbound to the cloud relay — no port forwarding or firewall changes needed.
 
-1. Add a **WebSocket DAT** in Client mode:
-   - **Network Address**: `vibe-coat-production.up.railway.app`
-   - **Network Port**: `443`
-   - **SSL**: enabled
-2. Enable the DAT — incoming vibes appear in the received data
-3. Add a **Table DAT** and append each incoming `vibe` value as a new row
-4. Add a script that reads the last 5 rows, calls an LLM with your system prompt, and passes the result to the Daydream.live API
+**1. Connect to the relay**
+
+Add a **WebSocket DAT** and set:
+
+| Parameter | Value |
+|---|---|
+| Active | On |
+| Mode | Client |
+| Network Address | `vibe-coat-production.up.railway.app` |
+| Network Port | `443` |
+| SSL | Enabled (TLS 1.2) |
+
+Click **Active** to connect. Incoming messages will appear in the DAT.
+
+**2. Parse incoming vibes**
+
+Each message is JSON in this shape:
+
+```json
+{"vibe": "user text", "from": "ip address", "timestamp": "2026-04-02T17:00:00.000Z"}
+```
+
+Use a **DAT Execute** or **Script DAT** to parse the `vibe` field and append it to a **Table DAT**.
+
+**3. Aggregate and generate**
+
+Add a script that:
+1. Reads the last 5 rows from the Table DAT
+2. Sends them to an LLM with a system prompt to combine them into a single visual prompt
+3. Passes the result to the Daydream.live API to update the live video stream
 
 ## Development
 
