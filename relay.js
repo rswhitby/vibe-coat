@@ -3,12 +3,21 @@
 // Browser connects to ws://localhost:9980  (sends vibes)
 // TouchDesigner connects to ws://localhost:9980  (receives vibes)
 
+const http = require('http');
 const { WebSocketServer } = require('ws');
 
 const PORT = process.env.PORT || 9980;
-const wss = new WebSocketServer({ port: PORT });
 
-console.log(`Relay listening on ws://localhost:${PORT}`);
+const server = http.createServer((_req, res) => {
+  res.writeHead(200);
+  res.end('ok');
+});
+
+const wss = new WebSocketServer({ server });
+
+server.listen(PORT, () => {
+  console.log(`Relay listening on ws://localhost:${PORT}`);
+});
 
 wss.on('connection', (socket, req) => {
   const id = req.socket.remoteAddress + ':' + req.socket.remotePort;
