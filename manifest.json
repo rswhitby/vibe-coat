@@ -2,7 +2,7 @@
   "name": "Vibe Coat",
   "short_name": "Vibe Coat",
   "description": "Chroma-key your world with AI video streams",
-  "start_url": "/",
+  "start_url": "/vibe-coat/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#000000",

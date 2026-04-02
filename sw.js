@@ -1,9 +1,9 @@
 const CACHE = 'vibe-coat-v1';
 const SHELL = [
-  '/',
-  '/index.html',
-  '/main.js',
-  '/style.css',
+  '/vibe-coat/',
+  '/vibe-coat/index.html',
+  '/vibe-coat/main.js',
+  '/vibe-coat/style.css',
 ];
 
 self.addEventListener('install', e => {

@@ -5,7 +5,7 @@
 
 const { WebSocketServer } = require('ws');
 
-const PORT = 9980;
+const PORT = process.env.PORT || 9980;
 const wss = new WebSocketServer({ port: PORT });
 
 console.log(`Relay listening on ws://localhost:${PORT}`);
