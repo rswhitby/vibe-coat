@@ -34,20 +34,32 @@ Open in Chrome on Android or Safari on iOS and use **Add to Home Screen**. The a
 3. Hold a colored object in front of the camera — it will be replaced by the stream for that color
 4. Tap the button again to deactivate
 
-## TouchDesigner integration
+## Vibe text pipeline
 
-The vibe input sends JSON over WebSocket to a TouchDesigner sketch:
+The app includes a text input field where participants type a "vibe" — a short phrase describing a mood, scene, or feeling. Submitting sends it as JSON over WebSocket to a TouchDesigner sketch:
 
 ```json
 {"vibe": "user text"}
 ```
 
-**Setup in TD:**
-1. Add a **WebSocket DAT**
-2. Set **Server Port** to `9980`
-3. Enable the DAT — incoming vibes appear in the received data
+### Full pipeline
 
-To change the WebSocket endpoint, edit `WS_URL` at the top of `main.js`.
+```
+Phone UI  →  WebSocket (port 9980)  →  TouchDesigner  →  LLM  →  Daydream.live API  →  live visual
+```
+
+1. **Phone UI** — user types a vibe and taps Send (or hits Enter). The message is sent via WebSocket to the relay server running on port `9980`.
+2. **TouchDesigner receives** — a WebSocket DAT in TD receives the JSON message and appends the `vibe` value to a Table DAT, building up a log of all submitted vibes.
+3. **LLM aggregation** — a script in TD takes the last 5 entries from the table and sends them to an LLM with a system prompt that combines them into a single cohesive visual prompt (e.g. merging "golden fog", "deep ocean", "neon forest" into one descriptive scene).
+4. **Daydream.live** — the combined prompt is sent to the Daydream.live API, which returns a live generative video stream. That stream feeds into the chroma-key overlay channels in the app.
+
+### TouchDesigner setup
+
+1. Add a **WebSocket DAT**, set **Server Port** to `9980`, and enable it — incoming vibes appear in the received data
+2. Add a **Table DAT** and append each incoming `vibe` value as a new row
+3. Add a script that reads the last 5 rows, calls an LLM with your system prompt, and passes the result to the Daydream.live API
+
+To change the WebSocket endpoint on the client side, edit `WS_URL` at the top of [main.js](main.js).
 
 ## Development
 
