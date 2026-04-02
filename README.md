@@ -51,7 +51,29 @@ To change the WebSocket endpoint, edit `WS_URL` at the top of `main.js`.
 
 ## Development
 
-No build step — just serve the files from any static host or local server:
+No build step. Install dependencies, then run the static file server and (optionally) the WebSocket relay:
+
+```bash
+npm install
+```
+
+**Serve the app:**
+
+```bash
+npm run serve
+```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+**WebSocket relay** (required for the vibe/TouchDesigner integration):
+
+```bash
+npm run relay
+```
+
+This starts the WebSocket relay on port `9980`. Run both commands in separate terminals to get the full stack.
+
+Alternatively, serve the files with any static server:
 
 ```bash
 python -m http.server 3000
