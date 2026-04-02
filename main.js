@@ -3,7 +3,7 @@
 // ----- WebSocket config (change URL to point at your TouchDesigner sketch) -----
 const WS_URL = location.hostname === 'localhost'
   ? 'ws://localhost:9980'
-  : 'wss://RAILWAY_HOSTNAME_HERE';
+  : 'wss://vibe-coat-production.up.railway.app';
 
 // ----- elements -----
 const videoCam = document.getElementById("video-cam");
