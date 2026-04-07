@@ -1,4 +1,4 @@
-const CACHE = 'vibe-coat-v1';
+const CACHE = 'vibe-coat-v2';
 const SHELL = [
   '/vibe-coat/',
   '/vibe-coat/index.html',
