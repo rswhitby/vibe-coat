@@ -32,7 +32,12 @@ Object.entries(streams).forEach(([color, video]) => {
   video.playsInline  = true;
   video.loop         = true;
 
-  const hls = new Hls();
+  const hls = new Hls({
+    lowLatencyMode: true,
+    liveSyncDurationCount: 2,
+    liveMaxLatencyDurationCount: 5,
+    backBufferLength: 0,
+  });
   hls.loadSource(hlsStreams[color]);
   hls.attachMedia(video);
   hls.on(Hls.Events.MANIFEST_PARSED, () => {
