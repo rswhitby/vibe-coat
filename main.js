@@ -32,17 +32,23 @@ Object.entries(streams).forEach(([color, video]) => {
   video.playsInline  = true;
   video.loop         = true;
 
-  const hls = new Hls({
-    lowLatencyMode: true,
-    liveSyncDurationCount: 2,
-    liveMaxLatencyDurationCount: 5,
-    backBufferLength: 0,
-  });
-  hls.loadSource(hlsStreams[color]);
-  hls.attachMedia(video);
-  hls.on(Hls.Events.MANIFEST_PARSED, () => {
+  if (Hls.isSupported()) {
+    const hls = new Hls({
+      lowLatencyMode: true,
+      liveSyncDurationCount: 2,
+      liveMaxLatencyDurationCount: 5,
+      backBufferLength: 0,
+    });
+    hls.loadSource(hlsStreams[color]);
+    hls.attachMedia(video);
+    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      video.play().catch(console.warn);
+    });
+  } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+    // Safari — native HLS support
+    video.src = hlsStreams[color];
     video.play().catch(console.warn);
-  });
+  }
 });
 
 // enabled flags + buttons
