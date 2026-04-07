@@ -34,9 +34,9 @@ Object.entries(streams).forEach(([color, video]) => {
 
   if (Hls.isSupported()) {
     const hls = new Hls({
-      lowLatencyMode: true,
-      liveSyncDurationCount: 2,
-      liveMaxLatencyDurationCount: 5,
+      liveSyncDurationCount: 1,
+      liveMaxLatencyDurationCount: 4,
+      maxLiveSyncPlaybackRate: 1.5,
       backBufferLength: 0,
     });
     hls.loadSource(hlsStreams[color]);
