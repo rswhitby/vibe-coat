@@ -21,8 +21,8 @@ const streams = {
 
 // ----- LIVE HLS URLs -----
 const hlsStreams = {
-  green: "https://stream2.ovationav.com/green.m3u8",
-  blue: "https://stream2.ovationav.com/blue.m3u8",
+  green: "https://customer-faum3k08z80qrv3z.cloudflarestream.com/edf0b001b1e164ebea24f470b5815849/manifest/video.m3u8",
+  blue: "https://customer-faum3k08z80qrv3z.cloudflarestream.com/edf0b001b1e164ebea24f470b5815849/manifest/video.m3u8",
 };
 
 // ----- init HLS on each overlay -----
