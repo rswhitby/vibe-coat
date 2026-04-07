@@ -21,8 +21,8 @@ const streams = {
 
 // ----- LIVE HLS URLs -----
 const hlsStreams = {
-  green: "https://customer-faum3k08z80qrv3z.cloudflarestream.com/edf0b001b1e164ebea24f470b5815849/manifest/video.m3u8",
-  blue: "https://customer-faum3k08z80qrv3z.cloudflarestream.com/edf0b001b1e164ebea24f470b5815849/manifest/video.m3u8",
+  green: "https://customer-faum3k08z80qrv3z.cloudflarestream.com/4b0713bf32dbda7e64ebbf6e9a00ae21/manifest/video.m3u8?protocol=llhlsbeta",
+  blue:  "https://customer-faum3k08z80qrv3z.cloudflarestream.com/4b0713bf32dbda7e64ebbf6e9a00ae21/manifest/video.m3u8?protocol=llhlsbeta",
 };
 
 // ----- init HLS on each overlay -----
