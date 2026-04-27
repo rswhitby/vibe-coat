@@ -153,16 +153,28 @@ function drawVideoCover(ctx, video, dstW, dstH, rotateDeg = 0) {
   ctx.restore();
 }
 
+// ----- test mode -----
+let testMode = false;
+const btnTest = document.getElementById('btn-test');
+btnTest.addEventListener('click', () => {
+  testMode = !testMode;
+  btnTest.classList.toggle('active', testMode);
+});
+
 // ----- render loop -----
 function renderFrame() {
   // 1) draw camera (no rotation)
   drawVideoCover(ctx, videoCam, canvas.width, canvas.height, 0);
 
   // 2) composite enabled overlays; rotate when landscape
-  const overlayRotate = OVERLAY_ROTATE_DEG;  // always rotate by fixed angle
-  
-  for (const color in enabled) {
-    if (enabled[color]) applyChroma(streams[color], thresholds[color], overlayRotate);
+  const overlayRotate = OVERLAY_ROTATE_DEG;
+
+  if (testMode) {
+    drawVideoCover(ctx, streams.green, canvas.width, canvas.height, overlayRotate);
+  } else {
+    for (const color in enabled) {
+      if (enabled[color]) applyChroma(streams[color], thresholds[color], overlayRotate);
+    }
   }
 
   if ('requestVideoFrameCallback' in videoCam) {
