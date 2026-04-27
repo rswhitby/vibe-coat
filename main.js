@@ -8,7 +8,7 @@ const WS_URL = location.hostname === 'localhost'
 // ----- elements -----
 const videoCam = document.getElementById("video-cam");
 const canvas   = document.getElementById("output");
-const ctx      = canvas.getContext("2d");
+const ctx      = canvas.getContext("2d", { willReadFrequently: true });
 const buttons  = document.querySelectorAll("#controls button");
 
 // Always rotate overlays by this angle (90 or -90). Set to 0 to disable.
@@ -161,7 +161,7 @@ function applyChroma(srcVideo, t, rotateDeg) {
   const off = document.createElement("canvas");
   off.width  = canvas.width;
   off.height = canvas.height;
-  const offCtx = off.getContext("2d");
+  const offCtx = off.getContext("2d", { willReadFrequently: true });
 
   // draw the overlay with cover-fit + optional rotation
   drawVideoCover(offCtx, srcVideo, off.width, off.height, rotateDeg);
