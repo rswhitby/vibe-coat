@@ -16,17 +16,51 @@ Point your camera at a colored object. Tap the matching color button in the tool
 - Full-screen camera viewfinder
 - Real-time chroma-key compositing (HSV-based color matching)
 - Two color channels: green, blue
-- HLS video stream overlay per channel
-- Overlay rotation support for landscape sources
+- WebRTC (WHEP) video stream overlay per channel — sub-second latency
+- TEST button to show full overlay without chroma key
 - Vibe text input — sends requests to a TouchDesigner sketch via WebSocket
 - Installable PWA (works offline, add to home screen)
 
 ## Tech stack
 
 - Vanilla JS / HTML / CSS — no framework
-- [hls.js](https://github.com/video-dev/hls.js/) for HLS stream playback
+- Native `RTCPeerConnection` (WHEP) for WebRTC stream playback
 - Canvas 2D API for per-pixel compositing
 - Service worker for app shell caching
+
+## Stream setup
+
+The overlay streams are delivered via WebRTC using Cloudflare Stream as the media server. OBS pushes the stream in via WHIP; the browser pulls it via WHEP with sub-second latency.
+
+### Cloudflare Stream
+
+1. [dash.cloudflare.com](https://dash.cloudflare.com) → **Stream** → **Live Inputs** → **Create Live Input**
+2. Enable **WebRTC / Low Latency** on the input
+3. Set playback policy to **Public**
+4. Note the **WHIP URL** (for OBS) and **WHEP URL** (for the app — update `WHEP_URL` in `main.js`)
+
+### OBS setup (v30+)
+
+**Settings → Stream**
+
+| Field | Value |
+|---|---|
+| Service | `WHIP` |
+| Server | Your Cloudflare WHIP URL |
+| Bearer Token | Your Cloudflare stream key |
+
+**Settings → Output → Advanced → Streaming**
+
+| Field | Value |
+|---|---|
+| Video Encoder | `x264` |
+| Keyframe Interval | `1 s` |
+| CPU Usage Preset | `veryfast` |
+| Profile | `baseline` |
+| Tune | `zerolatency` |
+| Resolution | `512x512` |
+
+**Settings → Video** — set output resolution to `512x512`
 
 ## Install
 
