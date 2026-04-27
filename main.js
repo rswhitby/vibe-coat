@@ -19,36 +19,52 @@ const streams = {
   blue:   document.getElementById("video-blue"),
 };
 
-// ----- LIVE HLS URLs -----
-const hlsStreams = {
-  green: "https://customer-faum3k08z80qrv3z.cloudflarestream.com/4b0713bf32dbda7e64ebbf6e9a00ae21/manifest/video.m3u8?protocol=llhlsbeta",
-  blue:  "https://customer-faum3k08z80qrv3z.cloudflarestream.com/4b0713bf32dbda7e64ebbf6e9a00ae21/manifest/video.m3u8?protocol=llhlsbeta",
-};
+// ----- WebRTC WHEP playback -----
+const WHEP_URL = 'https://customer-faum3k08z80qrv3z.cloudflarestream.com/4b0713bf32dbda7e64ebbf6e9a00ae21/webRTC/play';
 
-// ----- init HLS on each overlay -----
-Object.entries(streams).forEach(([color, video]) => {
-  video.crossOrigin = "anonymous";
-  video.muted        = true;
-  video.playsInline  = true;
-  video.loop         = true;
+async function setupWHEP(video, url) {
+  const pc = new RTCPeerConnection({
+    iceServers: [{ urls: 'stun:stun.cloudflare.com:3478' }],
+    bundlePolicy: 'max-bundle',
+  });
 
-  if (Hls.isSupported()) {
-    const hls = new Hls({
-      liveSyncDurationCount: 1,
-      liveMaxLatencyDurationCount: 4,
-      maxLiveSyncPlaybackRate: 1.5,
-      backBufferLength: 0,
-    });
-    hls.loadSource(hlsStreams[color]);
-    hls.attachMedia(video);
-    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+  pc.addTransceiver('video', { direction: 'recvonly' });
+  pc.addTransceiver('audio', { direction: 'recvonly' });
+
+  pc.ontrack = (e) => {
+    if (!video.srcObject) {
+      video.srcObject = e.streams[0];
       video.play().catch(console.warn);
-    });
-  } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-    // Safari — native HLS support
-    video.src = hlsStreams[color];
-    video.play().catch(console.warn);
-  }
+    }
+  };
+
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+
+  // wait for ICE gathering (3s fallback)
+  await new Promise(resolve => {
+    if (pc.iceGatheringState === 'complete') return resolve();
+    pc.onicegatheringstatechange = () => {
+      if (pc.iceGatheringState === 'complete') resolve();
+    };
+    setTimeout(resolve, 3000);
+  });
+
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/sdp' },
+    body: pc.localDescription.sdp,
+  });
+  const body = await resp.text();
+  if (!resp.ok) throw new Error(`WHEP ${resp.status}: ${body}`);
+  await pc.setRemoteDescription({ type: 'answer', sdp: body });
+  return pc;
+}
+
+Object.values(streams).forEach(video => {
+  video.muted = true;
+  video.playsInline = true;
+  setupWHEP(video, WHEP_URL).catch(console.error);
 });
 
 // enabled flags + buttons
