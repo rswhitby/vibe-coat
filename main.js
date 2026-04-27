@@ -12,7 +12,7 @@ const ctx      = canvas.getContext("2d", { willReadFrequently: true });
 const buttons  = document.querySelectorAll("#controls button");
 
 // Always rotate overlays by this angle (90 or -90). Set to 0 to disable.
-const OVERLAY_ROTATE_DEG = 90;
+const OVERLAY_ROTATE_DEG = 0;
 
 const streams = {
   green:  document.getElementById("video-green"),
