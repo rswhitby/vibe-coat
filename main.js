@@ -107,7 +107,7 @@ function startCoatColors() {
 function dismissSplash() {
   clearInterval(coatInterval);
   splash.classList.add('fade-out');
-  splash.addEventListener('transitionend', () => splash.remove(), { once: true });
+  setTimeout(() => splash.remove(), 1500); // matches transition duration
 }
 
 function tryDismiss() {
