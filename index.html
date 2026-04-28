@@ -45,6 +45,21 @@
       </button>
     </div>
 
+    <!-- Settings panel (slides up from bottom) -->
+    <div id="settings-panel" aria-hidden="true">
+      <div class="settings-drag-handle"></div>
+      <h2 class="settings-title">Settings</h2>
+      <div class="setting-row">
+        <label for="tolerance-slider">Chroma Tolerance</label>
+        <div class="slider-track">
+          <span class="slider-hint">Tight</span>
+          <input type="range" id="tolerance-slider" min="0" max="100" value="50" />
+          <span class="slider-hint">Wide</span>
+        </div>
+      </div>
+    </div>
+    <div id="settings-backdrop"></div>
+
     <!-- Bottom toolbar -->
     <div id="toolbar">
       <!-- Chroma-key colour pickers -->

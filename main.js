@@ -209,11 +209,53 @@ function applyChroma(srcVideo, t, rotateDeg) {
   ctx.putImageData(bg, 0, 0);
 }
 
-// ----- thresholds (unchanged) -----
-const thresholds = {
-  green:  { hMin:110, hMax:170, sMin:0.4, sMax:1, vMin:0.3, vMax:1 },
-  blue:   { hMin:210, hMax:240, sMin:0.4, sMax:1, vMin:0.3, vMax:1 },
+// ----- thresholds -----
+const BASE_THRESHOLDS = {
+  green: { hMin:110, hMax:170, sMin:0.4, vMin:0.3 },
+  blue:  { hMin:210, hMax:240, sMin:0.4, vMin:0.3 },
 };
+
+const thresholds = {
+  green: { hMin:110, hMax:170, sMin:0.4, sMax:1, vMin:0.3, vMax:1 },
+  blue:  { hMin:210, hMax:240, sMin:0.4, sMax:1, vMin:0.3, vMax:1 },
+};
+
+function applyTolerance(t) {
+  const scale = t / 50; // 50 → 1× (default), 0 → 0×, 100 → 2×
+  for (const color of ['green', 'blue']) {
+    const base = BASE_THRESHOLDS[color];
+    const center = (base.hMin + base.hMax) / 2;
+    const halfW  = (base.hMax - base.hMin) / 2;
+    thresholds[color].hMin = Math.max(0,   center - halfW * scale);
+    thresholds[color].hMax = Math.min(360, center + halfW * scale);
+    thresholds[color].sMin = Math.max(0.05, base.sMin * (2 - scale));
+    thresholds[color].vMin = Math.max(0.05, base.vMin * (2 - scale));
+  }
+}
+
+// ----- settings panel -----
+const btnSettings      = document.getElementById('btn-settings');
+const settingsPanel    = document.getElementById('settings-panel');
+const settingsBackdrop = document.getElementById('settings-backdrop');
+const toleranceSlider  = document.getElementById('tolerance-slider');
+
+function openSettings() {
+  settingsPanel.classList.add('open');
+  settingsPanel.setAttribute('aria-hidden', 'false');
+  settingsBackdrop.classList.add('open');
+}
+
+function closeSettings() {
+  settingsPanel.classList.remove('open');
+  settingsPanel.setAttribute('aria-hidden', 'true');
+  settingsBackdrop.classList.remove('open');
+}
+
+btnSettings.addEventListener('click', () =>
+  settingsPanel.classList.contains('open') ? closeSettings() : openSettings()
+);
+settingsBackdrop.addEventListener('click', closeSettings);
+toleranceSlider.addEventListener('input', () => applyTolerance(Number(toleranceSlider.value)));
 
 // ----- helpers -----
 function matchColor({ r, g, b }, { hMin, hMax, sMin, sMax, vMin, vMax }) {
