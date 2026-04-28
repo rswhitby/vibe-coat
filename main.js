@@ -94,8 +94,18 @@ const splashLogo  = document.getElementById('splash-logo');
 
 let sequenceDone = false;
 let cameraReady  = false;
+let coatInterval = null;
+
+const splashCoat = document.getElementById('splash-coat');
+
+function startCoatColors() {
+  coatInterval = setInterval(() => {
+    splashCoat.style.color = `hsl(${Math.random() * 360 | 0}, 100%, 72%)`;
+  }, 550);
+}
 
 function dismissSplash() {
+  clearInterval(coatInterval);
   splash.classList.add('fade-out');
   splash.addEventListener('transitionend', () => splash.remove(), { once: true });
 }
@@ -107,8 +117,8 @@ function tryDismiss() {
 // Phase 1 — lines fade in via CSS (0.6s, 1.6s, 2.6s delays, 0.8s each)
 // Line 3 fully visible at ~3.4s. Give 0.5s to read then fade them out.
 setTimeout(() => splashLines.classList.add('fade-out'), 3900);
-// Phase 2 — logo fades in after lines are gone (~4.6s)
-setTimeout(() => splashLogo.classList.add('visible'), 4600);
+// Phase 2 — logo fades in after lines are gone (~4.6s), start color cycling
+setTimeout(() => { splashLogo.classList.add('visible'); startCoatColors(); }, 4600);
 // Phase 3 — hold 1s, then signal sequence done (~6.4s)
 setTimeout(() => { sequenceDone = true; tryDismiss(); }, 6400);
 

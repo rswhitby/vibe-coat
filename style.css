@@ -34,12 +34,17 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  font-size: 1.8rem;
+  font-size: 2.7rem;
   font-weight: 500;
   letter-spacing: 0.08em;
   color: #fff;
   opacity: 0;
   transition: opacity 0.8s ease;
+  white-space: nowrap;
+}
+
+#splash-coat {
+  transition: color 0.5s ease;
 }
 
 #splash-logo.visible {
