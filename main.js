@@ -114,13 +114,13 @@ function tryDismiss() {
   if (sequenceDone && cameraReady) dismissSplash();
 }
 
-// Phase 1 — lines fade in via CSS (0.6s, 1.6s, 2.6s delays, 0.8s each)
-// Line 3 fully visible at ~3.4s. Give 0.5s to read then fade them out.
-setTimeout(() => splashLines.classList.add('fade-out'), 3900);
-// Phase 2 — logo fades in after lines are gone (~4.6s), start color cycling
-setTimeout(() => { splashLogo.classList.add('visible'); startCoatColors(); }, 4600);
-// Phase 3 — hold ~3s, then signal sequence done (~8.4s)
-setTimeout(() => { sequenceDone = true; tryDismiss(); }, 8400);
+// Phase 1 — lines fade in via CSS (0.9s, 2.4s, 3.9s delays, 1.2s each)
+// Line 3 fully visible at ~5.1s. Give 0.5s to read then fade them out.
+setTimeout(() => splashLines.classList.add('fade-out'), 5600);
+// Phase 2 — logo fades in after lines are gone (~6.3s), start color cycling
+setTimeout(() => { splashLogo.classList.add('visible'); startCoatColors(); }, 6300);
+// Phase 3 — hold ~3s, then signal sequence done (~10.1s)
+setTimeout(() => { sequenceDone = true; tryDismiss(); }, 10100);
 
 // ----- camera -----
 navigator.mediaDevices.getUserMedia({

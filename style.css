@@ -58,8 +58,8 @@
   color: rgba(255, 255, 255, 0.88);
   opacity: 0;
   transform: translateY(10px);
-  animation: splash-line-in 0.8s ease forwards;
-  animation-delay: calc(0.6s + var(--i) * 1s);
+  animation: splash-line-in 1.2s ease forwards;
+  animation-delay: calc(0.9s + var(--i) * 1.5s);
 }
 
 @keyframes splash-line-in {
