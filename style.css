@@ -51,6 +51,7 @@ body {
   height: 100%;
   background: black;
   overflow: hidden;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }
 
 /* Canvas fills the screen behind the toolbar */
