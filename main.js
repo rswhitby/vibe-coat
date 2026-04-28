@@ -119,8 +119,8 @@ function tryDismiss() {
 setTimeout(() => splashLines.classList.add('fade-out'), 3900);
 // Phase 2 — logo fades in after lines are gone (~4.6s), start color cycling
 setTimeout(() => { splashLogo.classList.add('visible'); startCoatColors(); }, 4600);
-// Phase 3 — hold 1s, then signal sequence done (~6.4s)
-setTimeout(() => { sequenceDone = true; tryDismiss(); }, 6400);
+// Phase 3 — hold ~3s, then signal sequence done (~8.4s)
+setTimeout(() => { sequenceDone = true; tryDismiss(); }, 8400);
 
 // ----- camera -----
 navigator.mediaDevices.getUserMedia({
