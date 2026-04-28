@@ -168,6 +168,14 @@ function drawVideoCover(ctx, video, dstW, dstH, rotateDeg = 0) {
   ctx.restore();
 }
 
+// ----- snapshot -----
+document.getElementById('btn-snapshot').addEventListener('click', () => {
+  const a = document.createElement('a');
+  a.href = canvas.toDataURL('image/png');
+  a.download = `vibe-coat-${Date.now()}.png`;
+  a.click();
+});
+
 // ----- test mode -----
 let testMode = false;
 const btnTest = document.getElementById('btn-test');

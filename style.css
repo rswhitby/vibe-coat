@@ -199,6 +199,33 @@ body {
   color: #000;
 }
 
+#btn-snapshot {
+  position: absolute;
+  left: 1.25rem;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#btn-snapshot:active {
+  background: rgba(255,255,255,0.3);
+}
+
+#btn-snapshot svg {
+  width: 22px;
+  height: 22px;
+}
+
 #btn-settings {
   position: absolute;
   right: 1.25rem;
