@@ -87,6 +87,20 @@ buttons.forEach(btn => {
   });
 });
 
+// ----- splash -----
+const splash = document.getElementById('splash');
+const splashStart = Date.now();
+// line 3 finishes at 0.6 + 2*1.0 + 0.8 = 3.4s — give a beat to read then fade
+const SPLASH_MIN_MS = 4200;
+
+function dismissSplash() {
+  const remaining = SPLASH_MIN_MS - (Date.now() - splashStart);
+  setTimeout(() => {
+    splash.classList.add('fade-out');
+    splash.addEventListener('transitionend', () => splash.remove(), { once: true });
+  }, Math.max(0, remaining));
+}
+
 // ----- camera -----
 navigator.mediaDevices.getUserMedia({
   video: { facingMode: { ideal: "environment" } }
@@ -96,8 +110,8 @@ navigator.mediaDevices.getUserMedia({
   videoCam.play().catch(console.warn);
 
   videoCam.onloadedmetadata = () => {
-    // size the internal canvas buffer to the CSS box for crisp rendering
     syncCanvasToCSS();
+    dismissSplash();
     if ('requestVideoFrameCallback' in videoCam) {
       videoCam.requestVideoFrameCallback(renderFrame);
     } else {
@@ -107,6 +121,7 @@ navigator.mediaDevices.getUserMedia({
 })
 .catch(err => {
   console.error("Camera error:", err);
+  dismissSplash();
   alert(`Camera access failed: ${err.name}`);
 });
 
