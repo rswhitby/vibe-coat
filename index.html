@@ -49,17 +49,57 @@
     <div id="settings-panel" aria-hidden="true">
       <div class="settings-drag-handle"></div>
       <h2 class="settings-title">Settings</h2>
-      <div class="setting-row">
-        <label for="tolerance-slider">Chroma Tolerance</label>
-        <div class="slider-track">
-          <span class="slider-hint">Tight</span>
-          <input type="range" id="tolerance-slider" min="0" max="100" value="50" />
-          <span class="slider-hint">Wide</span>
+      <div class="settings-scroll">
+
+        <div class="settings-section">
+          <div class="settings-section-head">
+            <span class="settings-section-dot" style="background:#3cff00"></span>Green
+          </div>
+          <div class="setting-row">
+            <div class="slider-header"><label for="green-hmin">Hue Min</label><span class="slider-value" id="green-hmin-val">110</span></div>
+            <input type="range" id="green-hmin" min="0" max="360" value="110" />
+          </div>
+          <div class="setting-row">
+            <div class="slider-header"><label for="green-hmax">Hue Max</label><span class="slider-value" id="green-hmax-val">170</span></div>
+            <input type="range" id="green-hmax" min="0" max="360" value="170" />
+          </div>
+          <div class="setting-row">
+            <div class="slider-header"><label for="green-smin">Sat Min</label><span class="slider-value" id="green-smin-val">0.40</span></div>
+            <input type="range" id="green-smin" min="0" max="100" value="40" />
+          </div>
+          <div class="setting-row">
+            <div class="slider-header"><label for="green-smax">Sat Max</label><span class="slider-value" id="green-smax-val">1.00</span></div>
+            <input type="range" id="green-smax" min="0" max="100" value="100" />
+          </div>
         </div>
-      </div>
-      <div class="setting-row setting-row--inline">
-        <label>Test Overlay</label>
-        <button id="btn-test" aria-label="Test overlay">TEST</button>
+
+        <div class="settings-section">
+          <div class="settings-section-head">
+            <span class="settings-section-dot" style="background:#0011ff"></span>Blue
+          </div>
+          <div class="setting-row">
+            <div class="slider-header"><label for="blue-hmin">Hue Min</label><span class="slider-value" id="blue-hmin-val">210</span></div>
+            <input type="range" id="blue-hmin" min="0" max="360" value="210" />
+          </div>
+          <div class="setting-row">
+            <div class="slider-header"><label for="blue-hmax">Hue Max</label><span class="slider-value" id="blue-hmax-val">240</span></div>
+            <input type="range" id="blue-hmax" min="0" max="360" value="240" />
+          </div>
+          <div class="setting-row">
+            <div class="slider-header"><label for="blue-smin">Sat Min</label><span class="slider-value" id="blue-smin-val">0.40</span></div>
+            <input type="range" id="blue-smin" min="0" max="100" value="40" />
+          </div>
+          <div class="setting-row">
+            <div class="slider-header"><label for="blue-smax">Sat Max</label><span class="slider-value" id="blue-smax-val">1.00</span></div>
+            <input type="range" id="blue-smax" min="0" max="100" value="100" />
+          </div>
+        </div>
+
+        <div class="setting-row setting-row--inline">
+          <label>Test Overlay</label>
+          <button id="btn-test" aria-label="Test overlay">TEST</button>
+        </div>
+
       </div>
     </div>
     <div id="settings-backdrop"></div>
