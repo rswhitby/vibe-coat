@@ -94,8 +94,7 @@ const splashLogo  = document.getElementById('splash-logo');
 
 let sequenceDone = false;
 let cameraReady  = false;
-let coatInterval  = null;
-let psychInterval = null;
+let coatInterval = null;
 
 const splashCoat = document.getElementById('splash-coat');
 
@@ -106,32 +105,41 @@ function startCoatColors() {
   }, 550);
 }
 
-function animatePsychedelic() {
-  // gentle breathe on the main logo
-  splashLogo.style.animation = 'logo-breathe 0.75s ease-in-out infinite alternate';
+function animateLogoTrail() {
+  const travel    = window.innerHeight * 0.38; // px to move downward
+  const duration  = 2800;                      // ms for full travel
+  const ghostEvery = 85;                       // ms between ghost stamps
+  let lastGhost = 0;
+  const t0 = performance.now();
 
-  psychInterval = setInterval(() => {
-    const hue = Math.random() * 360 | 0;
-    const dx  = (Math.random() - 0.5) * 50;
-    const dy  = (Math.random() - 0.5) * 50;
-    const dur = 1100 + Math.random() * 600;
+  function frame(now) {
+    const p    = Math.min((now - t0) / duration, 1);
+    const ease = p * (2 - p);                 // ease-out quad
+    const dy   = ease * travel;
 
-    const ghost = document.createElement('div');
-    ghost.className = 'splash-ghost-pulse';
-    ghost.style.setProperty('--dx', `${dx}px`);
-    ghost.style.setProperty('--dy', `${dy}px`);
-    ghost.style.animationDuration = `${dur}ms`;
-    ghost.innerHTML = `vibe.<span style="color:hsl(${hue},100%,72%)">coat</span>`;
-    splash.insertBefore(ghost, splashLogo); // render behind main logo
-    setTimeout(() => ghost.remove(), dur + 50);
-  }, 105);
+    splashLogo.style.transform = `translate(-50%, calc(-50% + ${dy}px))`;
+
+    if (now - lastGhost > ghostEvery) {
+      lastGhost = now;
+      const ghost = document.createElement('div');
+      ghost.className = 'splash-ghost';
+      ghost.style.transform = `translate(-50%, calc(-50% + ${dy}px))`;
+      ghost.innerHTML = `vibe.<span style="color:${splashCoat.style.color}"">coat</span>`;
+      splash.appendChild(ghost);
+      requestAnimationFrame(() => ghost.classList.add('fading'));
+      setTimeout(() => ghost.remove(), 1100);
+    }
+
+    if (p < 1) requestAnimationFrame(frame);
+  }
+
+  requestAnimationFrame(frame);
 }
 
 function dismissSplash() {
   clearInterval(coatInterval);
-  clearInterval(psychInterval);
   splash.classList.add('fade-out');
-  setTimeout(() => splash.remove(), 1500);
+  setTimeout(() => splash.remove(), 1500); // matches transition duration
 }
 
 function tryDismiss() {
@@ -141,11 +149,11 @@ function tryDismiss() {
 // Phase 1 — lines fade in via CSS (0.9s, 2.4s, 3.9s delays, 1.2s each)
 // Line 3 fully visible at ~5.1s. Give 0.5s to read then fade them out.
 setTimeout(() => splashLines.classList.add('fade-out'), 5600);
-// Phase 2 — logo fades in after lines are gone (~6.3s), start color cycling + psychedelic pulse
+// Phase 2 — logo fades in after lines are gone (~6.3s), start color cycling + trail
 setTimeout(() => {
   splashLogo.classList.add('visible');
   startCoatColors();
-  setTimeout(animatePsychedelic, 700); // start pulsing after fade-in settles
+  setTimeout(animateLogoTrail, 700); // start moving after fade-in settles
 }, 6300);
 // Phase 3 — hold ~3s, then signal sequence done (~10.1s)
 setTimeout(() => { sequenceDone = true; tryDismiss(); }, 10100);

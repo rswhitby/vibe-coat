@@ -51,7 +51,7 @@
   opacity: 1;
 }
 
-.splash-ghost-pulse {
+.splash-ghost {
   position: absolute;
   top: 50%;
   left: 50%;
@@ -60,30 +60,13 @@
   letter-spacing: 0.08em;
   color: #fff;
   white-space: nowrap;
+  opacity: 0.5;
   pointer-events: none;
-  animation: ghost-pulse-out 1.4s ease-out forwards;
+  transition: opacity 1s ease;
 }
 
-@keyframes ghost-pulse-out {
-  0% {
-    transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1);
-    opacity: 0.8;
-    filter: blur(0px);
-  }
-  40% {
-    opacity: 0.55;
-    filter: blur(8px);
-  }
-  100% {
-    transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(10);
-    opacity: 0;
-    filter: blur(60px);
-  }
-}
-
-@keyframes logo-breathe {
-  from { transform: translate(-50%, -50%) scale(0.96); }
-  to   { transform: translate(-50%, -50%) scale(1.04); }
+.splash-ghost.fading {
+  opacity: 0;
 }
 
 .splash-line {
