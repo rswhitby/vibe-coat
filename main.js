@@ -99,9 +99,41 @@ let coatInterval = null;
 const splashCoat = document.getElementById('splash-coat');
 
 function startCoatColors() {
+  splashCoat.style.color = `hsl(${Math.random() * 360 | 0}, 100%, 72%)`;
   coatInterval = setInterval(() => {
     splashCoat.style.color = `hsl(${Math.random() * 360 | 0}, 100%, 72%)`;
   }, 550);
+}
+
+function animateLogoTrail() {
+  const travel    = window.innerHeight * 0.38; // px to move downward
+  const duration  = 2800;                      // ms for full travel
+  const ghostEvery = 85;                       // ms between ghost stamps
+  let lastGhost = 0;
+  const t0 = performance.now();
+
+  function frame(now) {
+    const p    = Math.min((now - t0) / duration, 1);
+    const ease = p * (2 - p);                 // ease-out quad
+    const dy   = ease * travel;
+
+    splashLogo.style.transform = `translate(-50%, calc(-50% + ${dy}px))`;
+
+    if (now - lastGhost > ghostEvery) {
+      lastGhost = now;
+      const ghost = document.createElement('div');
+      ghost.className = 'splash-ghost';
+      ghost.style.transform = `translate(-50%, calc(-50% + ${dy}px))`;
+      ghost.innerHTML = `vibe.<span style="color:${splashCoat.style.color}"">coat</span>`;
+      splash.appendChild(ghost);
+      requestAnimationFrame(() => ghost.classList.add('fading'));
+      setTimeout(() => ghost.remove(), 1100);
+    }
+
+    if (p < 1) requestAnimationFrame(frame);
+  }
+
+  requestAnimationFrame(frame);
 }
 
 function dismissSplash() {
@@ -117,8 +149,12 @@ function tryDismiss() {
 // Phase 1 — lines fade in via CSS (0.9s, 2.4s, 3.9s delays, 1.2s each)
 // Line 3 fully visible at ~5.1s. Give 0.5s to read then fade them out.
 setTimeout(() => splashLines.classList.add('fade-out'), 5600);
-// Phase 2 — logo fades in after lines are gone (~6.3s), start color cycling
-setTimeout(() => { splashLogo.classList.add('visible'); startCoatColors(); }, 6300);
+// Phase 2 — logo fades in after lines are gone (~6.3s), start color cycling + trail
+setTimeout(() => {
+  splashLogo.classList.add('visible');
+  startCoatColors();
+  setTimeout(animateLogoTrail, 700); // start moving after fade-in settles
+}, 6300);
 // Phase 3 — hold ~3s, then signal sequence done (~10.1s)
 setTimeout(() => { sequenceDone = true; tryDismiss(); }, 10100);
 
