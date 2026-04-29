@@ -19,6 +19,16 @@ const streams = {
   blue:   document.getElementById("video-blue"),
 };
 
+// one offscreen canvas per color, reused every frame (never re-created)
+const offscreens = {
+  green: document.createElement('canvas'),
+  blue:  document.createElement('canvas'),
+};
+const offCtxs = {
+  green: offscreens.green.getContext('2d', { willReadFrequently: true }),
+  blue:  offscreens.blue.getContext('2d',  { willReadFrequently: true }),
+};
+
 // ----- WebRTC WHEP playback -----
 const WHEP_URL = 'https://customer-faum3k08z80qrv3z.cloudflarestream.com/4b0713bf32dbda7e64ebbf6e9a00ae21/webRTC/play';
 
@@ -148,14 +158,15 @@ navigator.mediaDevices.getUserMedia({
   alert(`Camera access failed: ${err.name}`);
 });
 
-// keep canvas pixels matching its CSS size
+// keep canvas pixels matching its CSS size — cap DPR at 1.5 to limit pixel count
 function syncCanvasToCSS() {
-  const dpr = window.devicePixelRatio || 1;
+  const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
   const w = Math.round(canvas.clientWidth  * dpr || window.innerWidth  * dpr);
   const h = Math.round(canvas.clientHeight * dpr || window.innerHeight * dpr);
   if (canvas.width !== w || canvas.height !== h) {
     canvas.width = w;
     canvas.height = h;
+    for (const off of Object.values(offscreens)) { off.width = w; off.height = h; }
   }
 }
 window.addEventListener('resize', syncCanvasToCSS);
@@ -219,7 +230,7 @@ function renderFrame() {
     drawVideoCover(ctx, streams.green, canvas.width, canvas.height, overlayRotate);
   } else {
     for (const color in enabled) {
-      if (enabled[color]) applyChroma(streams[color], thresholds[color], overlayRotate);
+      if (enabled[color]) applyChroma(color, overlayRotate);
     }
   }
 
@@ -231,25 +242,23 @@ function renderFrame() {
 }
 
 // ----- chroma key with rotated overlay -----
-function applyChroma(srcVideo, t, rotateDeg) {
-  const off = document.createElement("canvas");
-  off.width  = canvas.width;
-  off.height = canvas.height;
-  const offCtx = off.getContext("2d", { willReadFrequently: true });
+function applyChroma(color, rotateDeg) {
+  const off    = offscreens[color];
+  const offCtx = offCtxs[color];
+  const t      = thresholds[color];
 
-  // draw the overlay with cover-fit + optional rotation
-  drawVideoCover(offCtx, srcVideo, off.width, off.height, rotateDeg);
+  drawVideoCover(offCtx, streams[color], off.width, off.height, rotateDeg);
 
   const bg = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const ov = offCtx.getImageData(0, 0, off.width, off.height);
+  const bd = bg.data, od = ov.data;
 
-  for (let i = 0; i < bg.data.length; i += 4) {
-    const r = bg.data[i], g = bg.data[i + 1], b = bg.data[i + 2];
-    if (matchColor({ r, g, b }, t)) {
-      bg.data[i]     = ov.data[i];
-      bg.data[i + 1] = ov.data[i + 1];
-      bg.data[i + 2] = ov.data[i + 2];
-      bg.data[i + 3] = ov.data[i + 3];
+  for (let i = 0; i < bd.length; i += 4) {
+    if (matchColor(bd[i], bd[i + 1], bd[i + 2], t)) {
+      bd[i]     = od[i];
+      bd[i + 1] = od[i + 1];
+      bd[i + 2] = od[i + 2];
+      bd[i + 3] = od[i + 3];
     }
   }
   ctx.putImageData(bg, 0, 0);
@@ -304,22 +313,22 @@ settingsBackdrop.addEventListener('click', closeSettings);
 });
 
 // ----- helpers -----
-function matchColor({ r, g, b }, { hMin, hMax, sMin, sMax, vMin, vMax }) {
-  const { h, s, v } = rgbToHsv(r / 255, g / 255, b / 255);
-  const inHue = hMin <= hMax ? (h >= hMin && h <= hMax) : (h >= hMin || h <= hMax);
-  return inHue && s >= sMin && s <= sMax && v >= vMin && v <= vMax;
-}
-function rgbToHsv(r, g, b) {
-  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
-  let h = 0, s = max ? d / max : 0, v = max;
+// Inlined HSV conversion with early exits — no object allocations per pixel
+function matchColor(r, g, b, t) {
+  const ri = r / 255, gi = g / 255, bi = b / 255;
+  const max = ri > gi ? (ri > bi ? ri : bi) : (gi > bi ? gi : bi);
+  if (max < t.vMin || max > t.vMax) return false;
+  const min = ri < gi ? (ri < bi ? ri : bi) : (gi < bi ? gi : bi);
+  const d = max - min;
+  const s = max ? d / max : 0;
+  if (s < t.sMin || s > t.sMax) return false;
+  let h = 0;
   if (d) {
-    switch (max) {
-      case r: h = ((g - b) / d + (g < b ? 6 : 0)) * 60; break;
-      case g: h = ((b - r) / d + 2) * 60; break;
-      case b: h = ((r - g) / d + 4) * 60; break;
-    }
+    if      (max === ri) h = ((gi - bi) / d + (gi < bi ? 6 : 0)) * 60;
+    else if (max === gi) h = ((bi - ri) / d + 2) * 60;
+    else                 h = ((ri - gi) / d + 4) * 60;
   }
-  return { h, s, v };
+  return t.hMin <= t.hMax ? (h >= t.hMin && h <= t.hMax) : (h >= t.hMin || h <= t.hMax);
 }
 
 // ----- WebSocket to TouchDesigner -----
