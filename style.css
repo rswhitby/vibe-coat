@@ -51,23 +51,6 @@
   opacity: 1;
 }
 
-.splash-ghost {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  font-size: 2.7rem;
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  color: #fff;
-  white-space: nowrap;
-  opacity: 0.5;
-  pointer-events: none;
-  transition: opacity 1s ease;
-}
-
-.splash-ghost.fading {
-  opacity: 0;
-}
 
 .splash-line {
   font-size: 1.4rem;
