@@ -107,26 +107,24 @@ function startCoatColors() {
 }
 
 function animatePsychedelic() {
+  // gentle breathe on the main logo
   splashLogo.style.animation = 'logo-breathe 0.75s ease-in-out infinite alternate';
 
   psychInterval = setInterval(() => {
-    const hue      = Math.random() * 360 | 0;
-    const leftPct  = Math.random() * 72;           // strip left edge 0–72% across
-    const widthPct = 4 + Math.random() * 18;       // strip width 4–22%
-    const dy       = 25 + Math.random() * 380;     // drift 25–405px downward
-    const dur      = 500 + Math.random() * 900;    // 0.5–1.4s
-    const sy       = 1.5 + (dy / 380) * 4;        // longer drift = more vertical smear
+    const hue = Math.random() * 360 | 0;
+    const dx  = (Math.random() - 0.5) * 50;
+    const dy  = (Math.random() - 0.5) * 50;
+    const dur = 1100 + Math.random() * 600;
 
-    const strip = document.createElement('div');
-    strip.className = 'pixel-sort-strip';
-    strip.style.setProperty('--dy',  `${dy}px`);
-    strip.style.setProperty('--dur', `${dur}ms`);
-    strip.style.setProperty('--sy',  sy.toFixed(2));
-    strip.style.clipPath = `inset(0 ${(100 - leftPct - widthPct).toFixed(1)}% 0 ${leftPct.toFixed(1)}%)`;
-    strip.innerHTML = `vibe.<span style="color:hsl(${hue},100%,72%)">coat</span>`;
-    splash.insertBefore(strip, splashLogo);
-    setTimeout(() => strip.remove(), dur + 100);
-  }, 85);
+    const ghost = document.createElement('div');
+    ghost.className = 'splash-ghost-pulse';
+    ghost.style.setProperty('--dx', `${dx}px`);
+    ghost.style.setProperty('--dy', `${dy}px`);
+    ghost.style.animationDuration = `${dur}ms`;
+    ghost.innerHTML = `vibe.<span style="color:hsl(${hue},100%,72%)">coat</span>`;
+    splash.insertBefore(ghost, splashLogo); // render behind main logo
+    setTimeout(() => ghost.remove(), dur + 50);
+  }, 105);
 }
 
 function dismissSplash() {
@@ -143,11 +141,11 @@ function tryDismiss() {
 // Phase 1 — lines fade in via CSS (0.9s, 2.4s, 3.9s delays, 1.2s each)
 // Line 3 fully visible at ~5.1s. Give 0.5s to read then fade them out.
 setTimeout(() => splashLines.classList.add('fade-out'), 5600);
-// Phase 2 — logo fades in after lines are gone (~6.3s), start color cycling + pixel sort
+// Phase 2 — logo fades in after lines are gone (~6.3s), start color cycling + psychedelic pulse
 setTimeout(() => {
   splashLogo.classList.add('visible');
   startCoatColors();
-  setTimeout(animatePsychedelic, 700); // start sorting after fade-in settles
+  setTimeout(animatePsychedelic, 700); // start pulsing after fade-in settles
 }, 6300);
 // Phase 3 — hold ~3s, then signal sequence done (~10.1s)
 setTimeout(() => { sequenceDone = true; tryDismiss(); }, 10100);

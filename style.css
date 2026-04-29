@@ -51,7 +51,7 @@
   opacity: 1;
 }
 
-.pixel-sort-strip {
+.splash-ghost-pulse {
   position: absolute;
   top: 50%;
   left: 50%;
@@ -61,27 +61,29 @@
   color: #fff;
   white-space: nowrap;
   pointer-events: none;
-  transform-origin: 50% 0%;
-  animation: pixel-smear var(--dur, 1s) ease-in forwards;
+  animation: ghost-pulse-out 1.4s ease-out forwards;
 }
 
-@keyframes pixel-smear {
+@keyframes ghost-pulse-out {
   0% {
-    transform: translate(-50%, -50%) scaleY(1);
-    opacity: 0.95;
+    transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1);
+    opacity: 0.8;
+    filter: blur(0px);
   }
-  15% {
-    opacity: 0.9;
+  40% {
+    opacity: 0.55;
+    filter: blur(8px);
   }
   100% {
-    transform: translate(-50%, calc(-50% + var(--dy))) scaleY(var(--sy, 2));
+    transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(10);
     opacity: 0;
+    filter: blur(60px);
   }
 }
 
 @keyframes logo-breathe {
-  from { transform: translate(-50%, -50%) scale(0.97); }
-  to   { transform: translate(-50%, -50%) scale(1.03); }
+  from { transform: translate(-50%, -50%) scale(0.96); }
+  to   { transform: translate(-50%, -50%) scale(1.04); }
 }
 
 .splash-line {
