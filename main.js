@@ -8,7 +8,6 @@ const WS_URL = location.hostname === 'localhost'
 // ----- elements -----
 const videoCam = document.getElementById("video-cam");
 const canvas   = document.getElementById("output");
-const ctx      = canvas.getContext("2d", { willReadFrequently: true });
 const buttons  = document.querySelectorAll("#controls button");
 
 // Always rotate overlays by this angle (90 or -90). Set to 0 to disable.
@@ -18,6 +17,15 @@ const streams = {
   green:  document.getElementById("video-green"),
   blue:   document.getElementById("video-blue"),
 };
+
+// ----- thresholds (tuned to the physical fabric — not the UI colours) -----
+const thresholds = {
+  green: { hMin:110, hMax:170, sMin:0.4, sMax:1, vMin:0.3, vMax:1 },
+  blue:  { hMin:210, hMax:240, sMin:0.4, sMax:1, vMin:0.3, vMax:1 },
+};
+
+const enabled = { green: false, blue: false };
+let testMode = false;
 
 // ----- WebRTC WHEP playback -----
 const WHEP_URL = 'https://customer-faum3k08z80qrv3z.cloudflarestream.com/4b0713bf32dbda7e64ebbf6e9a00ae21/webRTC/play';
@@ -41,7 +49,6 @@ async function setupWHEP(video, url) {
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
 
-  // wait for ICE gathering (3s fallback)
   await new Promise(resolve => {
     if (pc.iceGatheringState === 'complete') return resolve();
     pc.onicegatheringstatechange = () => {
@@ -68,6 +75,301 @@ Object.values(streams).forEach(video => {
 });
 
 // =====================================================================
+//  Renderer — WebGL, with a 2D canvas fallback
+// =====================================================================
+//
+//  The 2D path had to pull the whole frame back off the GPU with
+//  getImageData, run the HSV test in JS, then push it back with
+//  putImageData — about 30 MB of traffic per colour per frame at DPR.
+//  The shader does the same test per-fragment with no readback at all.
+
+const GL_OPTS = {
+  alpha: false,
+  antialias: false,
+  depth: false,
+  stencil: false,
+  premultipliedAlpha: false,
+  preserveDrawingBuffer: true,   // needed for the snapshot button
+  powerPreference: 'high-performance',
+};
+
+let gl = null;
+let ctx2d = null;
+
+try {
+  gl = canvas.getContext('webgl2', GL_OPTS) || canvas.getContext('webgl', GL_OPTS);
+} catch { gl = null; }
+
+if (!gl) {
+  console.warn('WebGL unavailable — falling back to the 2D chroma path');
+  ctx2d = canvas.getContext('2d', { willReadFrequently: true });
+}
+
+const VERT = `
+attribute vec2 aPos;
+varying vec2 vUv;
+void main() {
+  vUv = aPos * 0.5 + 0.5;
+  gl_Position = vec4(aPos, 0.0, 1.0);
+}`;
+
+const FRAG = `
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
+precision mediump float;
+#endif
+varying vec2 vUv;
+
+uniform sampler2D uCam, uGreen, uBlue;
+uniform vec4 uCamST, uGreenST, uBlueST;
+uniform mat2 uOvRot;
+uniform vec3 uGreenMin, uGreenMax, uBlueMin, uBlueMax;
+uniform float uGreenOn, uBlueOn, uTest;
+
+vec3 rgb2hsv(vec3 c) {
+  float mx = max(c.r, max(c.g, c.b));
+  float mn = min(c.r, min(c.g, c.b));
+  float d  = mx - mn;
+  float h  = 0.0;
+  if (d > 0.0001) {
+    if (mx == c.r)      h = mod((c.g - c.b) / d, 6.0);
+    else if (mx == c.g) h = (c.b - c.r) / d + 2.0;
+    else                h = (c.r - c.g) / d + 4.0;
+    h *= 60.0;
+  }
+  return vec3(h, mx > 0.0 ? d / mx : 0.0, mx);
+}
+
+bool inRange(vec3 hsv, vec3 lo, vec3 hi) {
+  bool inH = lo.x <= hi.x
+    ? (hsv.x >= lo.x && hsv.x <= hi.x)
+    : (hsv.x >= lo.x || hsv.x <= hi.x);
+  return inH && hsv.y >= lo.y && hsv.y <= hi.y && hsv.z >= lo.z && hsv.z <= hi.z;
+}
+
+vec2 mapUV(vec2 uv, vec4 st, mat2 rot) {
+  vec2 c = rot * (uv - 0.5) + 0.5;
+  return c * st.xy + st.zw;
+}
+
+void main() {
+  mat2 I = mat2(1.0, 0.0, 0.0, 1.0);
+  vec3 cam = texture2D(uCam, mapUV(vUv, uCamST, I)).rgb;
+
+  if (uTest > 0.5) {
+    gl_FragColor = vec4(texture2D(uGreen, mapUV(vUv, uGreenST, uOvRot)).rgb, 1.0);
+    return;
+  }
+
+  vec3 hsv = rgb2hsv(cam);
+  vec3 col = cam;
+
+  if (uGreenOn > 0.5 && inRange(hsv, uGreenMin, uGreenMax))
+    col = texture2D(uGreen, mapUV(vUv, uGreenST, uOvRot)).rgb;
+  if (uBlueOn > 0.5 && inRange(hsv, uBlueMin, uBlueMax))
+    col = texture2D(uBlue, mapUV(vUv, uBlueST, uOvRot)).rgb;
+
+  gl_FragColor = vec4(col, 1.0);
+}`;
+
+let prog = null, uni = {}, texCam = null, texGreen = null, texBlue = null;
+
+function compile(type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+    throw new Error(gl.getShaderInfoLog(s) || 'shader compile failed');
+  }
+  return s;
+}
+
+function makeTexture() {
+  const t = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, t);
+  // NPOT-safe: clamp + linear, no mipmaps
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+                new Uint8Array([0, 0, 0, 255]));
+  return t;
+}
+
+function initGL() {
+  prog = gl.createProgram();
+  gl.attachShader(prog, compile(gl.VERTEX_SHADER, VERT));
+  gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FRAG));
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+    throw new Error(gl.getProgramInfoLog(prog) || 'program link failed');
+  }
+  gl.useProgram(prog);
+
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER,
+    new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW); // full-screen triangle
+  const loc = gl.getAttribLocation(prog, 'aPos');
+  gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+
+  for (const n of ['uCam','uGreen','uBlue','uCamST','uGreenST','uBlueST','uOvRot',
+                   'uGreenMin','uGreenMax','uBlueMin','uBlueMax',
+                   'uGreenOn','uBlueOn','uTest']) {
+    uni[n] = gl.getUniformLocation(prog, n);
+  }
+
+  gl.uniform1i(uni.uCam, 0);
+  gl.uniform1i(uni.uGreen, 1);
+  gl.uniform1i(uni.uBlue, 2);
+
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+
+  texCam   = makeTexture();
+  texGreen = makeTexture();
+  texBlue  = makeTexture();
+}
+
+if (gl) {
+  try {
+    initGL();
+  } catch (err) {
+    console.error('WebGL init failed, falling back to 2D:', err);
+    gl = null;
+    ctx2d = canvas.getContext('2d', { willReadFrequently: true });
+  }
+}
+
+// Cover-fit as a scale/offset pair in texture space
+function coverST(texW, texH, viewW, viewH, rotated) {
+  if (!texW || !texH || !viewW || !viewH) return [1, 1, 0, 0];
+  if (rotated) { const t = texW; texW = texH; texH = t; }
+  const texA  = texW / texH;
+  const viewA = viewW / viewH;
+  if (viewA > texA) {
+    const sy = texA / viewA;
+    return [1, sy, 0, (1 - sy) / 2];
+  }
+  const sx = viewA / texA;
+  return [sx, 1, (1 - sx) / 2, 0];
+}
+
+function uploadVideo(tex, unit, video) {
+  if (!video || video.readyState < 2 || !video.videoWidth) return false;
+  gl.activeTexture(gl.TEXTURE0 + unit);
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
+  return true;
+}
+
+function renderGL() {
+  const w = canvas.width, h = canvas.height;
+  gl.viewport(0, 0, w, h);
+
+  const rot = OVERLAY_ROTATE_DEG % 180 !== 0;
+  const a = (-OVERLAY_ROTATE_DEG * Math.PI) / 180;
+  const c = Math.cos(a), s = Math.sin(a);
+  gl.uniformMatrix2fv(uni.uOvRot, false, [c, s, -s, c]);
+
+  uploadVideo(texCam, 0, videoCam);
+  const gOK = uploadVideo(texGreen, 1, streams.green);
+  const bOK = uploadVideo(texBlue,  2, streams.blue);
+
+  gl.uniform4fv(uni.uCamST,
+    coverST(videoCam.videoWidth, videoCam.videoHeight, w, h, false));
+  gl.uniform4fv(uni.uGreenST,
+    coverST(streams.green.videoWidth, streams.green.videoHeight, w, h, rot));
+  gl.uniform4fv(uni.uBlueST,
+    coverST(streams.blue.videoWidth, streams.blue.videoHeight, w, h, rot));
+
+  const g = thresholds.green, b = thresholds.blue;
+  gl.uniform3f(uni.uGreenMin, g.hMin, g.sMin, g.vMin);
+  gl.uniform3f(uni.uGreenMax, g.hMax, g.sMax, g.vMax);
+  gl.uniform3f(uni.uBlueMin,  b.hMin, b.sMin, b.vMin);
+  gl.uniform3f(uni.uBlueMax,  b.hMax, b.sMax, b.vMax);
+
+  gl.uniform1f(uni.uGreenOn, enabled.green && gOK ? 1 : 0);
+  gl.uniform1f(uni.uBlueOn,  enabled.blue  && bOK ? 1 : 0);
+  gl.uniform1f(uni.uTest,    testMode && gOK ? 1 : 0);
+
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+}
+
+// ---------- 2D fallback ----------
+
+function drawVideoCover(c2, video, dstW, dstH, rotateDeg = 0) {
+  const vw = video.videoWidth  || 0;
+  const vh = video.videoHeight || 0;
+  if (!vw || !vh) return;
+
+  c2.save();
+  if (rotateDeg % 180 !== 0) {
+    c2.translate(dstW / 2, dstH / 2);
+    c2.rotate((rotateDeg * Math.PI) / 180);
+    const scale = Math.max(dstW / vh, dstH / vw);
+    c2.drawImage(video, -vw * scale / 2, -vh * scale / 2, vw * scale, vh * scale);
+  } else {
+    const scale = Math.max(dstW / vw, dstH / vh);
+    const dw = vw * scale, dh = vh * scale;
+    c2.drawImage(video, (dstW - dw) / 2, (dstH - dh) / 2, dw, dh);
+  }
+  c2.restore();
+}
+
+const fbOff = { green: null, blue: null };
+
+function applyChroma2D(color, rotateDeg) {
+  if (!fbOff[color]) fbOff[color] = document.createElement('canvas');
+  const off = fbOff[color];
+  if (off.width !== canvas.width || off.height !== canvas.height) {
+    off.width = canvas.width; off.height = canvas.height;
+  }
+  const offCtx = off.getContext('2d', { willReadFrequently: true });
+  drawVideoCover(offCtx, streams[color], off.width, off.height, rotateDeg);
+
+  const t  = thresholds[color];
+  const bg = ctx2d.getImageData(0, 0, canvas.width, canvas.height);
+  const ov = offCtx.getImageData(0, 0, off.width, off.height);
+  const bd = bg.data, od = ov.data;
+
+  for (let i = 0; i < bd.length; i += 4) {
+    const r = bd[i] / 255, g = bd[i+1] / 255, b = bd[i+2] / 255;
+    const mx = r > g ? (r > b ? r : b) : (g > b ? g : b);
+    if (mx < t.vMin || mx > t.vMax) continue;
+    const mn = r < g ? (r < b ? r : b) : (g < b ? g : b);
+    const d = mx - mn;
+    const s = mx ? d / mx : 0;
+    if (s < t.sMin || s > t.sMax) continue;
+    let h = 0;
+    if (d) {
+      if (mx === r)      h = ((g - b) / d + (g < b ? 6 : 0)) * 60;
+      else if (mx === g) h = ((b - r) / d + 2) * 60;
+      else               h = ((r - g) / d + 4) * 60;
+    }
+    const inH = t.hMin <= t.hMax
+      ? (h >= t.hMin && h <= t.hMax)
+      : (h >= t.hMin || h <= t.hMax);
+    if (!inH) continue;
+    bd[i] = od[i]; bd[i+1] = od[i+1]; bd[i+2] = od[i+2]; bd[i+3] = od[i+3];
+  }
+  ctx2d.putImageData(bg, 0, 0);
+}
+
+function render2D() {
+  drawVideoCover(ctx2d, videoCam, canvas.width, canvas.height, 0);
+  if (testMode) {
+    drawVideoCover(ctx2d, streams.green, canvas.width, canvas.height, OVERLAY_ROTATE_DEG);
+  } else {
+    for (const color in enabled) {
+      if (enabled[color]) applyChroma2D(color, OVERLAY_ROTATE_DEG);
+    }
+  }
+}
+
+// =====================================================================
 //  Router
 // =====================================================================
 
@@ -81,16 +383,14 @@ const views = {
   credits:  document.getElementById('view-credits'),
 };
 
-const btnMenu  = document.getElementById('btn-menu');
-const toolbar  = document.getElementById('toolbar');
-const utility  = document.getElementById('utility');
+const btnMenu = document.getElementById('btn-menu');
+const toolbar = document.getElementById('toolbar');
+const utility = document.getElementById('utility');
 
-// Views that show the blue/green circles
 const CIRCLE_VIEWS = new Set(['home', 'camera']);
 
 let currentView  = 'home';
-let cameraActive = false;   // camera stream running
-let permissionAsked = false;
+let cameraActive = false;
 
 function showView(name) {
   if (!views[name]) name = cameraActive ? 'camera' : 'home';
@@ -100,10 +400,7 @@ function showView(name) {
     el.classList.toggle('is-active', key === name);
   }
 
-  // canvas only visible on the camera view
   canvas.classList.toggle('is-live', name === 'camera' && cameraActive);
-
-  // circles on home + camera; utility icons everywhere except menu
   toolbar.classList.toggle('is-visible', CIRCLE_VIEWS.has(name));
   utility.classList.toggle('is-visible', name !== 'menu');
 
@@ -113,7 +410,6 @@ function showView(name) {
   if (name === 'current') renderVibes();
 }
 
-// "Give a Vibe" returns to wherever the visitor was in the flow
 function resolveHash() {
   const raw = (location.hash || '').replace(/^#/, '');
   if (!raw || raw === 'give') return cameraActive ? 'camera' : 'home';
@@ -124,7 +420,7 @@ function navigate(name) {
   const target = name === 'give' ? (cameraActive ? 'camera' : 'home') : name;
   if (('#' + name) !== location.hash) {
     location.hash = name;
-    return; // hashchange fires showView
+    return;
   }
   showView(target);
 }
@@ -132,11 +428,7 @@ function navigate(name) {
 window.addEventListener('hashchange', () => showView(resolveHash()));
 
 btnMenu.addEventListener('click', () => {
-  if (currentView === 'menu') {
-    navigate('give');
-  } else {
-    navigate('menu');
-  }
+  navigate(currentView === 'menu' ? 'give' : 'menu');
 });
 
 // =====================================================================
@@ -147,8 +439,8 @@ const homeHint = document.getElementById('home-hint');
 
 function syncCanvasToCSS() {
   const dpr = window.devicePixelRatio || 1;
-  const w = Math.round(canvas.clientWidth  * dpr || window.innerWidth  * dpr);
-  const h = Math.round(canvas.clientHeight * dpr || window.innerHeight * dpr);
+  const w = Math.round((canvas.clientWidth  || window.innerWidth)  * dpr);
+  const h = Math.round((canvas.clientHeight || window.innerHeight) * dpr);
   if (canvas.width !== w || canvas.height !== h) {
     canvas.width = w;
     canvas.height = h;
@@ -159,7 +451,6 @@ window.addEventListener('orientationchange', syncCanvasToCSS);
 
 async function startCamera() {
   if (cameraActive) return true;
-  permissionAsked = true;
   homeHint.textContent = 'Requesting camera…';
 
   try {
@@ -178,12 +469,7 @@ async function startCamera() {
     syncCanvasToCSS();
     cameraActive = true;
     homeHint.textContent = '';
-
-    if ('requestVideoFrameCallback' in videoCam) {
-      videoCam.requestVideoFrameCallback(renderFrame);
-    } else {
-      requestAnimationFrame(renderFrame);
-    }
+    scheduleFrame();
     return true;
 
   } catch (err) {
@@ -196,9 +482,26 @@ async function startCamera() {
   }
 }
 
-// ----- colour circles -----
-const enabled = { green: false, blue: false };
+// ----- render loop -----
+function scheduleFrame() {
+  if ('requestVideoFrameCallback' in videoCam) {
+    videoCam.requestVideoFrameCallback(renderFrame);
+  } else {
+    requestAnimationFrame(renderFrame);
+  }
+}
 
+function renderFrame() {
+  // Idle whenever the camera view isn't on screen
+  if (currentView !== 'camera' || !cameraActive) {
+    setTimeout(scheduleFrame, 200);
+    return;
+  }
+  if (gl) renderGL(); else render2D();
+  scheduleFrame();
+}
+
+// ----- colour circles -----
 function toggleColor(color, btn) {
   enabled[color] = !enabled[color];
   btn.classList.toggle('active', enabled[color]);
@@ -217,13 +520,10 @@ buttons.forEach(btn => {
   btn.addEventListener('click', async () => {
     const color = btn.dataset.color;
 
-    // From home: send the typed vibe, ask for camera, then cross-fade.
     if (currentView === 'home') {
       sendVibe(vibeInput.value);
-
       const ok = await startCamera();
       if (!ok) return;
-
       toggleColor(color, btn);
       navigate('camera');
       return;
@@ -232,34 +532,6 @@ buttons.forEach(btn => {
     toggleColor(color, btn);
   });
 });
-
-// ----- drawing helpers (cover fit + optional rotation) -----
-function drawVideoCover(ctx, video, dstW, dstH, rotateDeg = 0) {
-  const vw = video.videoWidth  || 0;
-  const vh = video.videoHeight || 0;
-  if (!vw || !vh) return;
-
-  ctx.save();
-
-  if (rotateDeg % 180 !== 0) {
-    ctx.translate(dstW / 2, dstH / 2);
-    ctx.rotate((rotateDeg * Math.PI) / 180);
-
-    const scale = Math.max(dstW / vh, dstH / vw);
-    const dw = vw * scale;
-    const dh = vh * scale;
-    ctx.drawImage(video, -dw / 2, -dh / 2, dw, dh);
-  } else {
-    const scale = Math.max(dstW / vw, dstH / vh);
-    const dw = vw * scale;
-    const dh = vh * scale;
-    const dx = (dstW - dw) / 2;
-    const dy = (dstH - dh) / 2;
-    ctx.drawImage(video, dx, dy, dw, dh);
-  }
-
-  ctx.restore();
-}
 
 // ----- snapshot -----
 document.getElementById('btn-snapshot').addEventListener('click', () => {
@@ -270,74 +542,11 @@ document.getElementById('btn-snapshot').addEventListener('click', () => {
 });
 
 // ----- test mode -----
-let testMode = false;
 const btnTest = document.getElementById('btn-test');
 btnTest.addEventListener('click', () => {
   testMode = !testMode;
   btnTest.classList.toggle('active', testMode);
 });
-
-// ----- render loop -----
-function renderFrame() {
-  // Skip the expensive per-pixel work whenever the camera view isn't on
-  // screen — phones parked on the menu shouldn't burn battery.
-  if (currentView !== 'camera') {
-    if ('requestVideoFrameCallback' in videoCam) {
-      videoCam.requestVideoFrameCallback(renderFrame);
-    } else {
-      setTimeout(() => requestAnimationFrame(renderFrame), 200);
-    }
-    return;
-  }
-
-  drawVideoCover(ctx, videoCam, canvas.width, canvas.height, 0);
-
-  const overlayRotate = OVERLAY_ROTATE_DEG;
-
-  if (testMode) {
-    drawVideoCover(ctx, streams.green, canvas.width, canvas.height, overlayRotate);
-  } else {
-    for (const color in enabled) {
-      if (enabled[color]) applyChroma(streams[color], thresholds[color], overlayRotate);
-    }
-  }
-
-  if ('requestVideoFrameCallback' in videoCam) {
-    videoCam.requestVideoFrameCallback(renderFrame);
-  } else {
-    requestAnimationFrame(renderFrame);
-  }
-}
-
-// ----- chroma key with rotated overlay -----
-function applyChroma(srcVideo, t, rotateDeg) {
-  const off = document.createElement("canvas");
-  off.width  = canvas.width;
-  off.height = canvas.height;
-  const offCtx = off.getContext("2d", { willReadFrequently: true });
-
-  drawVideoCover(offCtx, srcVideo, off.width, off.height, rotateDeg);
-
-  const bg = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const ov = offCtx.getImageData(0, 0, off.width, off.height);
-
-  for (let i = 0; i < bg.data.length; i += 4) {
-    const r = bg.data[i], g = bg.data[i + 1], b = bg.data[i + 2];
-    if (matchColor({ r, g, b }, t)) {
-      bg.data[i]     = ov.data[i];
-      bg.data[i + 1] = ov.data[i + 1];
-      bg.data[i + 2] = ov.data[i + 2];
-      bg.data[i + 3] = ov.data[i + 3];
-    }
-  }
-  ctx.putImageData(bg, 0, 0);
-}
-
-// ----- thresholds (tuned to the physical fabric — not the UI colours) -----
-const thresholds = {
-  green: { hMin:110, hMax:170, sMin:0.4, sMax:1, vMin:0.3, vMax:1 },
-  blue:  { hMin:210, hMax:240, sMin:0.4, sMax:1, vMin:0.3, vMax:1 },
-};
 
 // ----- settings panel -----
 const btnSettings      = document.getElementById('btn-settings');
@@ -349,7 +558,6 @@ function openSettings() {
   settingsPanel.setAttribute('aria-hidden', 'false');
   settingsBackdrop.classList.add('open');
 }
-
 function closeSettings() {
   settingsPanel.classList.remove('open');
   settingsPanel.setAttribute('aria-hidden', 'true');
@@ -380,36 +588,9 @@ settingsBackdrop.addEventListener('click', closeSettings);
   });
 });
 
-// ----- helpers -----
-function matchColor({ r, g, b }, { hMin, hMax, sMin, sMax, vMin, vMax }) {
-  const { h, s, v } = rgbToHsv(r / 255, g / 255, b / 255);
-  const inHue = hMin <= hMax ? (h >= hMin && h <= hMax) : (h >= hMin || h <= hMax);
-  return inHue && s >= sMin && s <= sMax && v >= vMin && v <= vMax;
-}
-function rgbToHsv(r, g, b) {
-  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
-  let h = 0, s = max ? d / max : 0, v = max;
-  if (d) {
-    switch (max) {
-      case r: h = ((g - b) / d + (g < b ? 6 : 0)) * 60; break;
-      case g: h = ((b - r) / d + 2) * 60; break;
-      case b: h = ((r - g) / d + 4) * 60; break;
-    }
-  }
-  return { h, s, v };
-}
-
 // =====================================================================
 //  Current Vibes — accumulated client-side
 // =====================================================================
-//
-//  relay.js broadcasts each message to every OTHER client, so a phone
-//  already receives everyone else's vibes. Its own submissions are added
-//  locally, since the relay never echoes to the sender.
-//
-//  "Current atmosphere" has no source yet — TouchDesigner would need to
-//  emit {"type":"atmosphere","text":"..."}. The hook below is ready for
-//  it and the block stays hidden until one arrives.
 
 const MAX_VIBES = 12;
 const latestVibes = [];
@@ -455,7 +636,6 @@ function connectWS() {
   ws.addEventListener('message', evt => {
     let msg;
     try { msg = JSON.parse(evt.data); } catch { return; }
-
     if (msg.type === 'atmosphere' || typeof msg.atmosphere === 'string') {
       setAtmosphere(msg.text || msg.atmosphere);
       return;
@@ -463,13 +643,8 @@ function connectWS() {
     if (typeof msg.vibe === 'string') addVibe(msg.vibe);
   });
 
-  ws.addEventListener('close', () => {
-    setTimeout(connectWS, 3000); // auto-reconnect
-  });
-
-  ws.addEventListener('error', () => {
-    ws.close(); // triggers the close handler above
-  });
+  ws.addEventListener('close', () => setTimeout(connectWS, 3000));
+  ws.addEventListener('error', () => ws.close());
 }
 
 function sendVibe(text) {
@@ -483,13 +658,11 @@ function sendVibe(text) {
 }
 
 vibeInput.addEventListener('keydown', e => {
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    vibeInput.blur();
-  }
+  if (e.key === 'Enter') { e.preventDefault(); vibeInput.blur(); }
 });
 
 connectWS();
 
 // ----- boot -----
+syncCanvasToCSS();
 showView(resolveHash());
