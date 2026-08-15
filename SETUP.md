@@ -1,6 +1,8 @@
 # Vibe Coat — Setup Runbook
 
-Rebuilding the full pipeline on a fresh machine. Written August 2026, picking up from the April build.
+Reconnecting the pipeline after a gap. Written August 2026, picking up from the April build.
+
+Everything is already installed and the repo is already cloned. This is a checklist of things to verify and reconnect, not an install guide. Steps 1 and 2 are near no-ops; the real work is Steps 4–6.
 
 ## Pipeline shape
 
@@ -29,7 +31,7 @@ Verified 15 Aug 2026:
 | GitHub repo | Local clone in sync with `origin/main` at `8046c88` |
 | `relay.js`, `main.js`, `sw.js` | Parse clean under Node 22 |
 
-Nothing in the code needs repair. The work is machine setup plus reconnecting the two cloud services.
+Nothing in the code needs repair and nothing needs installing. The only open work is reconnecting the two cloud services and deciding on the StreamDiffusionTD version.
 
 ---
 
@@ -46,25 +48,18 @@ The only thing you may need to download is a newer StreamDiffusionTD TOX. See St
 
 ---
 
-## Step 2 — Clone
+## Step 2 — Clear the line-ending noise
 
-```bash
-git clone https://github.com/rswhitby/vibe-coat.git
-cd vibe-coat
-```
+The repo is already cloned at `C:\Users\rswhi\OneDrive\Documents\GitHub\vibe-coat`, in sync with `origin/main` at `8046c88`. Nothing to clone, and no `npm install` for normal operation — the app is static files on GitHub Pages and the relay runs on Railway.
 
-No install step for normal operation. The app is static files served from GitHub Pages, and the relay runs on Railway. `npm install` (one dependency, `ws`) is only needed if you want a local relay — see Step 5.
-
-### Line endings
-
-`git status` currently shows all nine tracked files as modified. This is CRLF/LF noise from OneDrive, not real edits — every file shows equal insertions and deletions. Clear it with:
+One actual task here. `git status` shows all nine tracked files as modified, but it's CRLF/LF noise from OneDrive, not real edits — the diff is 961 insertions against 961 deletions. Clear it:
 
 ```bash
 git config core.autocrlf true
 git checkout -- .
 ```
 
-Do this before making real changes, otherwise every diff will be unreadable.
+Do this before making real changes, otherwise the `main.js` edit in Step 6 will be buried in whitespace.
 
 ---
 
@@ -101,12 +96,9 @@ Full local install guide, if you ever want it: https://dotsimulate.com/docs/stre
 
 Latest file: `Touchdesigner/Vibe_Coat_Websocket_v3.7.toe` in the repo.
 
-Note there are two parallel copies of the TD work and they have diverged:
+The repo is the source of truth: `OneDrive/Documents/GitHub/vibe-coat/Touchdesigner/` holds v3 and v3.7, plus Backup v3.1–v3.3.
 
-- **Repo** (`OneDrive/Documents/GitHub/vibe-coat/Touchdesigner/`) — v3, v3.7, plus Backup v3.1–v3.3
-- **Google Drive** (`Freelance/Je-Le/Vibe-Coat/`) — only up to v2.2
-
-The repo copy is newer. Use v3.7 and ignore the Drive folder, or you will lose four versions of work.
+An older copy exists on Google Drive (`Freelance/Je-Le/Vibe-Coat/`) that only goes up to v2.2. It is stale and out of scope — don't open TD files from there.
 
 ### Verify the WebSocket DAT
 
@@ -191,7 +183,7 @@ Shell assets are network-first as of commit `8e385ba`, so this mainly matters fo
 1. **Cloudflare Stream** — does the April live input still exist, or does the WHEP URL need regenerating? This is the single most likely blocker.
 2. **Daydream** — you said credits are still active. Confirm the API key works from the Builder Dashboard, since the key format may have changed when the hosted operator shipped.
 2a. **StreamDiffusionTD version** — check the operator's About page. Determines whether Step 3 is a download or a no-op.
-3. **The two TouchDesigner folders** — worth deleting or archiving the Google Drive copy so there's one source of truth.
+3. **The stale Google Drive copy** — holds `Vibe_Coat_Websocket.toe` through v2.2 plus its own Backup folder. Superseded by the repo's v3.x, but never checked for anything unique. Archive or delete it at some point so there's one source of truth.
 
 3a. **Can Daydream replace OBS + Cloudflare?** Daydream is a streaming platform in its own right and may expose a playback URL directly, which would let you drop two moving parts from the path and point `WHEP_URL` at Daydream instead. Untested — this is a change you never made, not a step you forgot. Worth investigating before the next install run, but don't attempt it while trying to get back to a known-good state.
 4. **Which .toe is actually current** — `v3.toe` and `v3.7.toe` are the same file, confirmed by matching MD5 (`b5784c39...`). One is a redundant copy. Backup holds three genuinely distinct earlier versions (v3.1, v3.2, v3.3).
