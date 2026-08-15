@@ -636,6 +636,20 @@ function connectWS() {
   ws.addEventListener('message', evt => {
     let msg;
     try { msg = JSON.parse(evt.data); } catch { return; }
+
+    // Sent once on connect. Replaces the list rather than appending, so a
+    // reconnecting phone doesn't duplicate its own earlier submissions.
+    if (msg.type === 'history') {
+      if (Array.isArray(msg.vibes)) {
+        latestVibes.length = 0;
+        msg.vibes.slice(-MAX_VIBES).reverse()
+          .forEach(v => { if (typeof v === 'string' && v.trim()) latestVibes.push(v.trim()); });
+        if (currentView === 'current') renderVibes();
+      }
+      if (msg.atmosphere) setAtmosphere(msg.atmosphere);
+      return;
+    }
+
     if (msg.type === 'atmosphere' || typeof msg.atmosphere === 'string') {
       setAtmosphere(msg.text || msg.atmosphere);
       return;
