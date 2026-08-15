@@ -637,8 +637,23 @@ function connectWS() {
     let msg;
     try { msg = JSON.parse(evt.data); } catch { return; }
 
-    // Sent once on connect. Replaces the list rather than appending, so a
-    // reconnecting phone doesn't duplicate its own earlier submissions.
+    // Authoritative snapshot from TouchDesigner: the full vibe list from
+    // select1 plus the composed prompt from null2. Replaces whatever the
+    // phone had accumulated locally, so every phone shows the same thing
+    // regardless of when it connected.
+    if (msg.type === 'state') {
+      if (Array.isArray(msg.vibes)) {
+        latestVibes.length = 0;
+        msg.vibes.forEach(v => {
+          if (typeof v === 'string' && v.trim()) latestVibes.push(v.trim());
+        });
+        if (currentView === 'current') renderVibes();
+      }
+      if (msg.atmosphere) setAtmosphere(msg.atmosphere);
+      return;
+    }
+
+    // Relay's own fallback history, used only before TD has sent a state.
     if (msg.type === 'history') {
       if (Array.isArray(msg.vibes)) {
         latestVibes.length = 0;

@@ -22,6 +22,11 @@ const MAX_MESSAGE = 4096;      // ignore anything larger
 // installation that is most visitors.
 const recentVibes = [];        // oldest first, plain strings
 let lastAtmosphere = null;     // plain string
+let lastState = null;          // whole stamped {type:'state'} message from TD
+
+// NOTE: all of this is in-process memory. It resets on every deploy and
+// on any Railway restart. TouchDesigner re-sends its full state whenever
+// the prompt changes, so the gap closes on the next agent run.
 
 const server = http.createServer((_req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -50,9 +55,12 @@ wss.on('connection', (socket, req) => {
   // replaces its list with, rather than replaying each vibe — that way a
   // reconnecting phone doesn't receive its own earlier submissions back
   // and end up with duplicates.
-  if (recentVibes.length || lastAtmosphere) {
-    try { socket.send(historyPayload()); } catch { /* socket already gone */ }
-  }
+  // TouchDesigner's state is authoritative when we have it; the locally
+  // accumulated history is only a fallback for when TD hasn't sent yet.
+  try {
+    if (lastState) socket.send(lastState);
+    else if (recentVibes.length || lastAtmosphere) socket.send(historyPayload());
+  } catch { /* socket already gone */ }
 
   socket.on('message', (data) => {
     const text = data.toString();
@@ -71,7 +79,11 @@ wss.on('connection', (socket, req) => {
     const stamped = JSON.stringify(payload);
 
     // Record for late joiners
-    if (payload.type === 'atmosphere' || typeof payload.atmosphere === 'string') {
+    if (payload.type === 'state') {
+      lastState = stamped;
+      console.log(`[=] state       ${(payload.vibes || []).length} vibes, ` +
+                  `atmosphere ${payload.atmosphere ? 'set' : 'empty'}`);
+    } else if (payload.type === 'atmosphere' || typeof payload.atmosphere === 'string') {
       const atmos = payload.text || payload.atmosphere;
       if (typeof atmos === 'string' && atmos.trim()) {
         lastAtmosphere = atmos.trim();
