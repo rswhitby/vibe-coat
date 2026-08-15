@@ -28,8 +28,12 @@ Verified 15 Aug 2026:
 | --- | --- |
 | `https://vibeco.at` | Live, serving the PWA |
 | Railway relay | Responding on HTTPS |
-| GitHub repo | Local clone in sync with `origin/main` at `8046c88` |
+| GitHub repo | Local clone present, 2 commits ahead of `origin/main` |
 | `relay.js`, `main.js`, `sw.js` | Parse clean under Node 22 |
+| Cloudflare live input | Alive, ID matches `main.js` — no change needed |
+| **Full pipeline** | **Working end to end, confirmed 15 Aug 2026** |
+
+The whole chain came back up with **no code changes**. Phone → Railway relay → TouchDesigner → StreamDiffusionTD/Daydream → Spout → OBS → Cloudflare WHIP → phone WHEP. The only work was reconfiguring OBS's encoder and clearing a line-ending mess in git.
 
 Nothing in the code needs repair and nothing needs installing. The only open work is reconnecting the two cloud services and deciding on the StreamDiffusionTD version.
 
@@ -146,21 +150,84 @@ This is the most likely thing to be broken, because `main.js` hardcodes a Cloudf
 const WHEP_URL = 'https://customer-faum3k08z80qrv3z.cloudflarestream.com/4b0713bf32dbda7e64ebbf6e9a00ae21/webRTC/play';
 ```
 
-Check whether that live input still exists in your Cloudflare dashboard. If it was deleted or the account lapsed, create a new one:
+Work through the three links in order: TD → OBS, OBS → Cloudflare, Cloudflare → phone.
 
-1. dash.cloudflare.com → **Stream** → **Live Inputs** → **Create Live Input**
-2. Enable **WebRTC / Low Latency**
-3. Playback policy → **Public**
-4. Copy the WHEP URL into `WHEP_URL` in `main.js`
-5. Copy the WHIP URL and key into OBS
+### 6a. TouchDesigner → OBS (Spout)
 
-### OBS settings
+Spout shares GPU textures between Windows apps on the same machine. No network hop, no encode step.
 
-**Settings → Stream:** Service `WHIP`, Server = Cloudflare WHIP URL, Bearer Token = stream key.
+**In TouchDesigner:**
 
-**Settings → Output → Advanced → Streaming:** x264, keyframe interval `1s`, preset `veryfast`, profile `baseline`, tune `zerolatency`, 512x512.
+1. Add a **Spout Out TOP** and wire your final 512x512 output into it
+2. Set **Sender Name** to something identifiable, e.g. `VibeCoat`
+3. Confirm resolution is `512x512` — the April commit "Remove overlay rotation for square 512x512 OBS source" means downstream geometry assumes square
 
-**Settings → Video:** output resolution `512x512`.
+**In OBS:**
+
+1. Install the Spout2 plugin if it isn't already: https://github.com/Off-World-Live/obs-spout2-plugin
+2. Restart OBS
+3. Add source → **Spout2 Capture**
+4. Pick the `VibeCoat` sender
+5. Resize the source to fill the 512x512 canvas exactly — letterboxing here shifts the chroma-key regions on the phone
+
+Spout can drop more frames than NDI on the same machine. If that shows up as stutter, NDI is the fallback; it costs an encode/decode round trip but is steadier.
+
+### 6b. OBS → Cloudflare (WHIP)
+
+**The April live input still exists** — confirmed 15 Aug. Live Input ID `4b0713bf…` and customer subdomain `customer-faum3k08z…` both match what `main.js` already points at. Nothing to recreate.
+
+#### Which URL goes where
+
+Two different URLs, two different IDs, and mixing them up is the easy mistake:
+
+| Use | Where in dashboard | ID it contains |
+| --- | --- | --- |
+| **WHIP** → OBS | Broadcast tab → WebRTC | the publish **secret** |
+| **WHEP** → `main.js` | Playback tab → Protocol URLs → WebRTC (WHEP) Playback URL | the public **input ID** |
+
+Per [Cloudflare's docs](https://developers.cloudflare.com/stream/webrtc-beta/), `webRTC.url` is `.../<SECRET>/webRTC/publish` and `webRTCPlayback.url` is `.../<INPUT_UID>/webRTC/play`. The publish URL is a credential — anyone holding it can broadcast to the input. Never commit it to this repo, which is public.
+
+#### Do not use RTMPS or SRT
+
+The dashboard offers both, but Cloudflare does not support ingesting over RTMP/SRT and playing back over WHEP — the protocols must be paired. Since the app plays via WHEP, OBS must publish via WHIP. The RTMPS and SRT tabs are a dead end here.
+
+#### OBS settings
+
+**Settings → Stream:** Service `WHIP`, Server = the WHIP URL from the Broadcast tab, **Bearer Token = blank**. Cloudflare carries auth in the URL path, so no token is needed. (An earlier version of this doc said to paste the stream key here — that was wrong, and carried over from RTMPS.)
+
+**Settings → Output** (Output Mode `Advanced` → Streaming tab):
+
+| Field | Value |
+| --- | --- |
+| Video Encoder | `x264` |
+| Rate Control | `CBR` |
+| Bitrate | `2500 Kbps` |
+| Keyframe Interval | `1 s` |
+| CPU Usage Preset | `veryfast` |
+| Profile | `baseline` |
+| Tune | `zerolatency` |
+| Rescale Output | `Disabled` |
+| Audio Encoder | `FFmpeg Opus` |
+
+**Use x264, not NVENC.** Cloudflare's WHEP accepts h264 **Constrained Baseline Profile Level 3.1** only, and NVENC on recent cards has dropped baseline support. At 512x512 x264 costs almost nothing.
+
+Defaults that break low-latency WebRTC, if you're wondering why so many fields change: keyframe interval `0 s` (auto) lets gaps run several seconds so joining viewers wait; `Two Passes` and `Look-ahead` buffer frames ahead; B-Frames add reordering delay. `zerolatency` disables all of it. And OBS's default 10000 Kbps is roughly 40x what a 512x512 frame needs — it stalls on cell before it ever looks better.
+
+**Settings → Video:** base and output resolution both `512x512`.
+
+Hit **Start Streaming**. The dashboard preview should flip from "Disconnected" to live within a few seconds. If it doesn't, the problem is here, not in the app.
+
+### 6c. Cloudflare → phone (WHEP)
+
+**Nothing to do.** The existing `WHEP_URL` in `main.js` already points at the live input that still exists, so no edit and no service worker bump are needed.
+
+Only if you ever recreate the input, update the constant and then bump the cache (Step 7):
+
+```js
+const WHEP_URL = 'https://customer-<id>.cloudflarestream.com/<input-id>/webRTC/play';
+```
+
+**Test order matters.** Confirm the Cloudflare dashboard shows "Live" *before* testing on the phone. Tapping TEST on the phone can't tell a deleted input apart from a live-but-idle one — both render as nothing.
 
 Source in OBS is the TouchDesigner output carrying the StreamDiffusion result.
 
@@ -168,7 +235,9 @@ Source in OBS is the TouchDesigner output carrying the StreamDiffusion result.
 
 ## Step 7 — Bust the service worker cache
 
-`sw.js` is on cache `vibe-coat-v7`. If you edit `main.js` (which Step 6 requires), bump that string or phones will keep serving the old cached bundle:
+Not needed this time — `main.js` was never edited, since the Cloudflare input survived.
+
+`sw.js` is on cache `vibe-coat-v7`. If you ever *do* edit `main.js`, bump that string or phones will keep serving the old cached bundle:
 
 ```js
 const CACHE = 'vibe-coat-v8';
@@ -180,9 +249,9 @@ Shell assets are network-first as of commit `8e385ba`, so this mainly matters fo
 
 ## Open questions to resolve
 
-1. **Cloudflare Stream** — does the April live input still exist, or does the WHEP URL need regenerating? This is the single most likely blocker.
-2. **Daydream** — you said credits are still active. Confirm the API key works from the Builder Dashboard, since the key format may have changed when the hosted operator shipped.
-2a. **StreamDiffusionTD version** — check the operator's About page. Determines whether Step 3 is a download or a no-op.
+1. ~~**Cloudflare Stream** — does the April live input still exist?~~ **Resolved 15 Aug: it does.** ID and subdomain both match `main.js`. No changes needed on the app side.
+2. ~~**Daydream** — does the API key still work?~~ **Resolved: yes.** The pipeline generates end to end.
+2a. **StreamDiffusionTD version** — still unchecked. Worth knowing before the next install run: if you're on v0.2.99 you're running local GPU inference, and moving to v0.3.1 + Daydream hosted would free the machine from that. Not urgent now that it works.
 3. **The stale Google Drive copy** — holds `Vibe_Coat_Websocket.toe` through v2.2 plus its own Backup folder. Superseded by the repo's v3.x, but never checked for anything unique. Archive or delete it at some point so there's one source of truth.
 
 3a. **Can Daydream replace OBS + Cloudflare?** Daydream is a streaming platform in its own right and may expose a playback URL directly, which would let you drop two moving parts from the path and point `WHEP_URL` at Daydream instead. Untested — this is a change you never made, not a step you forgot. Worth investigating before the next install run, but don't attempt it while trying to get back to a known-good state.
