@@ -1,4 +1,4 @@
-// main.js
+// main.js — Vibe Coating
 
 // ----- WebSocket config (change URL to point at your TouchDesigner sketch) -----
 const WS_URL = location.hostname === 'localhost'
@@ -67,93 +67,84 @@ Object.values(streams).forEach(video => {
   setupWHEP(video, WHEP_URL).catch(console.error);
 });
 
-// enabled flags + buttons
-const enabled = { green: false, blue: false };
+// =====================================================================
+//  Router
+// =====================================================================
 
-buttons.forEach(btn => {
-  btn.addEventListener("click", () => {
-    const color = btn.dataset.color;
-    enabled[color] = !enabled[color];
-    btn.classList.toggle("active", enabled[color]);
+const views = {
+  home:     document.getElementById('view-home'),
+  camera:   document.getElementById('view-camera'),
+  menu:     document.getElementById('view-menu'),
+  about:    document.getElementById('view-about'),
+  starters: document.getElementById('view-starters'),
+  current:  document.getElementById('view-current'),
+  credits:  document.getElementById('view-credits'),
+};
 
-    const vid = streams[color];
-    if (enabled[color]) {
-      vid.muted = false;                // let audio through when active (optional)
-      vid.play().catch(console.warn);
-    } else {
-      vid.pause();
-      vid.muted = true;
-    }
-  });
+const btnMenu  = document.getElementById('btn-menu');
+const toolbar  = document.getElementById('toolbar');
+const utility  = document.getElementById('utility');
+
+// Views that show the blue/green circles
+const CIRCLE_VIEWS = new Set(['home', 'camera']);
+
+let currentView  = 'home';
+let cameraActive = false;   // camera stream running
+let permissionAsked = false;
+
+function showView(name) {
+  if (!views[name]) name = cameraActive ? 'camera' : 'home';
+  currentView = name;
+
+  for (const [key, el] of Object.entries(views)) {
+    el.classList.toggle('is-active', key === name);
+  }
+
+  // canvas only visible on the camera view
+  canvas.classList.toggle('is-live', name === 'camera' && cameraActive);
+
+  // circles on home + camera; utility icons everywhere except menu
+  toolbar.classList.toggle('is-visible', CIRCLE_VIEWS.has(name));
+  utility.classList.toggle('is-visible', name !== 'menu');
+
+  btnMenu.classList.toggle('is-open', name === 'menu');
+  btnMenu.setAttribute('aria-expanded', String(name === 'menu'));
+
+  if (name === 'current') renderVibes();
+}
+
+// "Give a Vibe" returns to wherever the visitor was in the flow
+function resolveHash() {
+  const raw = (location.hash || '').replace(/^#/, '');
+  if (!raw || raw === 'give') return cameraActive ? 'camera' : 'home';
+  return raw;
+}
+
+function navigate(name) {
+  const target = name === 'give' ? (cameraActive ? 'camera' : 'home') : name;
+  if (('#' + name) !== location.hash) {
+    location.hash = name;
+    return; // hashchange fires showView
+  }
+  showView(target);
+}
+
+window.addEventListener('hashchange', () => showView(resolveHash()));
+
+btnMenu.addEventListener('click', () => {
+  if (currentView === 'menu') {
+    navigate('give');
+  } else {
+    navigate('menu');
+  }
 });
 
-// ----- splash sequence -----
-const splash      = document.getElementById('splash');
-const splashLines = splash.querySelector('.splash-lines');
-const splashLogo  = document.getElementById('splash-logo');
+// =====================================================================
+//  Camera — permission deferred until first circle tap
+// =====================================================================
 
-let sequenceDone = false;
-let cameraReady  = false;
-let coatInterval = null;
+const homeHint = document.getElementById('home-hint');
 
-const splashCoat = document.getElementById('splash-coat');
-
-function startCoatColors() {
-  splashCoat.style.color = `hsl(${Math.random() * 360 | 0}, 100%, 72%)`;
-  coatInterval = setInterval(() => {
-    splashCoat.style.color = `hsl(${Math.random() * 360 | 0}, 100%, 72%)`;
-  }, 550);
-}
-
-
-function dismissSplash() {
-  clearInterval(coatInterval);
-  splash.classList.add('fade-out');
-  setTimeout(() => splash.remove(), 1500); // matches transition duration
-}
-
-function tryDismiss() {
-  if (sequenceDone && cameraReady) dismissSplash();
-}
-
-// Phase 1 — lines fade in via CSS (0.9s, 2.4s, 3.9s delays, 1.2s each)
-// Line 3 fully visible at ~5.1s. Give 0.5s to read then fade them out.
-setTimeout(() => splashLines.classList.add('fade-out'), 5600);
-// Phase 2 — logo fades in after lines are gone (~6.3s), start color cycling
-setTimeout(() => {
-  splashLogo.classList.add('visible');
-  startCoatColors();
-}, 6300);
-// Phase 3 — hold ~3s, then signal sequence done (~10.1s)
-setTimeout(() => { sequenceDone = true; tryDismiss(); }, 10100);
-
-// ----- camera -----
-navigator.mediaDevices.getUserMedia({
-  video: { facingMode: { ideal: "environment" } }
-})
-.then(camStream => {
-  videoCam.srcObject = camStream;
-  videoCam.play().catch(console.warn);
-
-  videoCam.onloadedmetadata = () => {
-    syncCanvasToCSS();
-    cameraReady = true;
-    tryDismiss();
-    if ('requestVideoFrameCallback' in videoCam) {
-      videoCam.requestVideoFrameCallback(renderFrame);
-    } else {
-      requestAnimationFrame(renderFrame);
-    }
-  };
-})
-.catch(err => {
-  console.error("Camera error:", err);
-  cameraReady = true;
-  tryDismiss();
-  alert(`Camera access failed: ${err.name}`);
-});
-
-// keep canvas pixels matching its CSS size
 function syncCanvasToCSS() {
   const dpr = window.devicePixelRatio || 1;
   const w = Math.round(canvas.clientWidth  * dpr || window.innerWidth  * dpr);
@@ -166,6 +157,82 @@ function syncCanvasToCSS() {
 window.addEventListener('resize', syncCanvasToCSS);
 window.addEventListener('orientationchange', syncCanvasToCSS);
 
+async function startCamera() {
+  if (cameraActive) return true;
+  permissionAsked = true;
+  homeHint.textContent = 'Requesting camera…';
+
+  try {
+    const camStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' } }
+    });
+
+    videoCam.srcObject = camStream;
+    await videoCam.play().catch(console.warn);
+
+    await new Promise(resolve => {
+      if (videoCam.readyState >= 1) return resolve();
+      videoCam.onloadedmetadata = resolve;
+    });
+
+    syncCanvasToCSS();
+    cameraActive = true;
+    homeHint.textContent = '';
+
+    if ('requestVideoFrameCallback' in videoCam) {
+      videoCam.requestVideoFrameCallback(renderFrame);
+    } else {
+      requestAnimationFrame(renderFrame);
+    }
+    return true;
+
+  } catch (err) {
+    console.error('Camera error:', err);
+    homeHint.textContent =
+      err.name === 'NotAllowedError'
+        ? 'Camera access was blocked. Enable it in your browser settings, then tap a circle again.'
+        : `Camera unavailable (${err.name}).`;
+    return false;
+  }
+}
+
+// ----- colour circles -----
+const enabled = { green: false, blue: false };
+
+function toggleColor(color, btn) {
+  enabled[color] = !enabled[color];
+  btn.classList.toggle('active', enabled[color]);
+
+  const vid = streams[color];
+  if (enabled[color]) {
+    vid.muted = false;
+    vid.play().catch(console.warn);
+  } else {
+    vid.pause();
+    vid.muted = true;
+  }
+}
+
+buttons.forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const color = btn.dataset.color;
+
+    // From home: send the typed vibe, ask for camera, then cross-fade.
+    if (currentView === 'home') {
+      sendVibe(vibeInput.value);
+
+      const ok = await startCamera();
+      if (!ok) return;
+
+      toggleColor(color, btn);
+      navigate('camera');
+      return;
+    }
+
+    toggleColor(color, btn);
+  });
+});
+
 // ----- drawing helpers (cover fit + optional rotation) -----
 function drawVideoCover(ctx, video, dstW, dstH, rotateDeg = 0) {
   const vw = video.videoWidth  || 0;
@@ -175,11 +242,9 @@ function drawVideoCover(ctx, video, dstW, dstH, rotateDeg = 0) {
   ctx.save();
 
   if (rotateDeg % 180 !== 0) {
-    // rotate about canvas center
     ctx.translate(dstW / 2, dstH / 2);
     ctx.rotate((rotateDeg * Math.PI) / 180);
 
-    // after rotation, width/height swap for cover math
     const scale = Math.max(dstW / vh, dstH / vw);
     const dw = vw * scale;
     const dh = vh * scale;
@@ -200,7 +265,7 @@ function drawVideoCover(ctx, video, dstW, dstH, rotateDeg = 0) {
 document.getElementById('btn-snapshot').addEventListener('click', () => {
   const a = document.createElement('a');
   a.href = canvas.toDataURL('image/png');
-  a.download = `vibe-coat-${Date.now()}.png`;
+  a.download = `vibe-coating-${Date.now()}.png`;
   a.click();
 });
 
@@ -214,10 +279,19 @@ btnTest.addEventListener('click', () => {
 
 // ----- render loop -----
 function renderFrame() {
-  // 1) draw camera (no rotation)
+  // Skip the expensive per-pixel work whenever the camera view isn't on
+  // screen — phones parked on the menu shouldn't burn battery.
+  if (currentView !== 'camera') {
+    if ('requestVideoFrameCallback' in videoCam) {
+      videoCam.requestVideoFrameCallback(renderFrame);
+    } else {
+      setTimeout(() => requestAnimationFrame(renderFrame), 200);
+    }
+    return;
+  }
+
   drawVideoCover(ctx, videoCam, canvas.width, canvas.height, 0);
 
-  // 2) composite enabled overlays; rotate when landscape
   const overlayRotate = OVERLAY_ROTATE_DEG;
 
   if (testMode) {
@@ -242,7 +316,6 @@ function applyChroma(srcVideo, t, rotateDeg) {
   off.height = canvas.height;
   const offCtx = off.getContext("2d", { willReadFrequently: true });
 
-  // draw the overlay with cover-fit + optional rotation
   drawVideoCover(offCtx, srcVideo, off.width, off.height, rotateDeg);
 
   const bg = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -260,7 +333,7 @@ function applyChroma(srcVideo, t, rotateDeg) {
   ctx.putImageData(bg, 0, 0);
 }
 
-// ----- thresholds -----
+// ----- thresholds (tuned to the physical fabric — not the UI colours) -----
 const thresholds = {
   green: { hMin:110, hMax:170, sMin:0.4, sMax:1, vMin:0.3, vMax:1 },
   blue:  { hMin:210, hMax:240, sMin:0.4, sMax:1, vMin:0.3, vMax:1 },
@@ -288,7 +361,6 @@ btnSettings.addEventListener('click', () =>
 );
 settingsBackdrop.addEventListener('click', closeSettings);
 
-// Wire each slider to its threshold key + readout
 [
   { id: 'green-hmin', color: 'green', key: 'hMin', scale: 1,    fmt: v => Math.round(v).toString() },
   { id: 'green-hmax', color: 'green', key: 'hMax', scale: 1,    fmt: v => Math.round(v).toString() },
@@ -327,20 +399,71 @@ function rgbToHsv(r, g, b) {
   return { h, s, v };
 }
 
-// ----- WebSocket to TouchDesigner -----
+// =====================================================================
+//  Current Vibes — accumulated client-side
+// =====================================================================
+//
+//  relay.js broadcasts each message to every OTHER client, so a phone
+//  already receives everyone else's vibes. Its own submissions are added
+//  locally, since the relay never echoes to the sender.
+//
+//  "Current atmosphere" has no source yet — TouchDesigner would need to
+//  emit {"type":"atmosphere","text":"..."}. The hook below is ready for
+//  it and the block stays hidden until one arrives.
+
+const MAX_VIBES = 12;
+const latestVibes = [];
+const elLatest     = document.getElementById('latest-vibes');
+const elAtmosBlock = document.getElementById('atmosphere-block');
+const elAtmosText  = document.getElementById('atmosphere-text');
+
+function addVibe(text) {
+  text = String(text || '').trim();
+  if (!text) return;
+  latestVibes.unshift(text);
+  if (latestVibes.length > MAX_VIBES) latestVibes.length = MAX_VIBES;
+  if (currentView === 'current') renderVibes();
+}
+
+function renderVibes() {
+  if (!latestVibes.length) {
+    elLatest.textContent = 'waiting for vibes…';
+    elLatest.classList.add('muted');
+    return;
+  }
+  elLatest.textContent = latestVibes.join(' • ');
+  elLatest.classList.remove('muted');
+}
+
+function setAtmosphere(text) {
+  text = String(text || '').trim();
+  if (!text) return;
+  elAtmosText.textContent = text;
+  elAtmosBlock.hidden = false;
+}
+
+// =====================================================================
+//  WebSocket
+// =====================================================================
+
 const vibeInput = document.getElementById('vibe-input');
-const vibeSend  = document.getElementById('vibe-send');
 let ws = null;
 
 function connectWS() {
   ws = new WebSocket(WS_URL);
 
-  ws.addEventListener('open', () => {
-    vibeSend.classList.remove('disconnected');
+  ws.addEventListener('message', evt => {
+    let msg;
+    try { msg = JSON.parse(evt.data); } catch { return; }
+
+    if (msg.type === 'atmosphere' || typeof msg.atmosphere === 'string') {
+      setAtmosphere(msg.text || msg.atmosphere);
+      return;
+    }
+    if (typeof msg.vibe === 'string') addVibe(msg.vibe);
   });
 
   ws.addEventListener('close', () => {
-    vibeSend.classList.add('disconnected');
     setTimeout(connectWS, 3000); // auto-reconnect
   });
 
@@ -350,17 +473,23 @@ function connectWS() {
 }
 
 function sendVibe(text) {
-  text = text.trim();
+  text = String(text || '').trim();
   if (!text) return;
   if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ vibe: text }));
+    ws.send(JSON.stringify({ type: 'vibe', vibe: text }));
   }
+  addVibe(text);          // relay never echoes to the sender
   vibeInput.value = '';
 }
 
-vibeSend.addEventListener('click', () => sendVibe(vibeInput.value));
 vibeInput.addEventListener('keydown', e => {
-  if (e.key === 'Enter') sendVibe(vibeInput.value);
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    vibeInput.blur();
+  }
 });
 
 connectWS();
+
+// ----- boot -----
+showView(resolveHash());

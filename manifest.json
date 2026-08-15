@@ -1,24 +1,14 @@
 {
-  "name": "Vibe Coat",
-  "short_name": "Vibe Coat",
-  "description": "Chroma-key your world with AI video streams",
-  "start_url": "/vibe-coat/",
+  "name": "Vibe Coating",
+  "short_name": "Vibe Coating",
+  "start_url": ".",
+  "scope": ".",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#000000",
-  "theme_color": "#000000",
+  "background_color": "#0041fb",
+  "theme_color": "#0041fb",
   "icons": [
-    {
-      "src": "icons/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "icons/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
   ]
 }
