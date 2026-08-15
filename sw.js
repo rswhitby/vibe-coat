@@ -1,4 +1,4 @@
-const CACHE = 'vibe-coating-v8';
+const CACHE = 'vibe-coating-v9';
 
 // Relative to the service worker's scope, so this works both at the
 // vibeco.at root and under a /vibe-coat/ project path.

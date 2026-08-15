@@ -1,6 +1,10 @@
 /* ===== Vibe Coating ===== */
 
 :root {
+  /* Declaring a scheme opts out of Android Chrome's Auto Dark Theme,
+     which otherwise dulls white borders and rings to a muddy tan. */
+  color-scheme: dark;
+
   --blue:  #0042e1;
   --green: #20c620;
   --tint:  #2626ff;      /* content-page duotone */
@@ -97,25 +101,25 @@ html, body {
 
 .home-title {
   margin: 0;
-  font-size: clamp(3.25rem, 16vw, 6.5rem);
+  font-size: clamp(3.5rem, 21vw, 9rem);
   font-weight: 500;
-  line-height: .92;
-  letter-spacing: -.022em;
+  line-height: .9;
+  letter-spacing: -.024em;
 }
 
 .home-copy,
 .view--doc p {
-  font-size: clamp(1.05rem, 4.7vw, 1.55rem);
+  font-size: clamp(1.35rem, 6.4vw, 2.3rem);
   font-weight: 500;
-  line-height: 1.2;
-  letter-spacing: -.012em;
+  line-height: 1.16;
+  letter-spacing: -.014em;
 }
 
 .home-copy { margin: clamp(1.5rem, 6vw, 2.5rem) 0 clamp(1.25rem, 5vw, 2rem); }
 
 .doc-title {
   margin: 0 0 .5em;
-  font-size: clamp(2.1rem, 7vw, 3.25rem);
+  font-size: clamp(2.6rem, 9.5vw, 4rem);
   font-weight: 500;
   line-height: 1;
   letter-spacing: -.02em;
@@ -133,13 +137,15 @@ html, body {
 
 #vibe-input {
   width: 100%;
-  padding: .72em .82em;
+  padding: .6em .78em;
+  appearance: none;
+  -webkit-appearance: none;
   font-family: inherit;
-  font-size: clamp(1.05rem, 4.7vw, 1.55rem);
+  font-size: clamp(1.35rem, 6.4vw, 2.3rem);
   font-weight: 500;
   color: var(--white);
   background: transparent;
-  border: 2.5px solid var(--white);
+  border: 5px solid #fff;
   border-radius: 999px;
   outline: none;
 }
@@ -163,7 +169,7 @@ html, body {
 .menu-list a {
   display: block;
   padding: .06em 0;
-  font-size: clamp(2.1rem, 7vw, 3.25rem);
+  font-size: clamp(2.6rem, 9.5vw, 4rem);
   font-weight: 500;
   line-height: 1.06;
   letter-spacing: -.02em;
@@ -179,7 +185,8 @@ html, body {
   top: calc(var(--safe-t) + var(--pad));
   right: var(--pad);
   z-index: 40;
-  width: 3rem; height: 2.2rem;
+  width: clamp(3.1rem, 13vw, 4.4rem);
+  aspect-ratio: 1.42;
   padding: 0;
   display: flex;
   flex-direction: column;
@@ -190,14 +197,14 @@ html, body {
 }
 #btn-menu span {
   display: block;
-  height: 4.5px;
+  height: 6px;
   border-radius: 3px;
-  background: var(--white);
+  background: #fff;
   transition: transform .3s var(--ease), opacity .2s var(--ease);
 }
-#btn-menu.is-open span:nth-child(1) { transform: translateY(8.6px) rotate(45deg); }
+#btn-menu.is-open span:nth-child(1) { transform: translateY(11px) rotate(45deg); }
 #btn-menu.is-open span:nth-child(2) { opacity: 0; }
-#btn-menu.is-open span:nth-child(3) { transform: translateY(-8.6px) rotate(-45deg); }
+#btn-menu.is-open span:nth-child(3) { transform: translateY(-11px) rotate(-45deg); }
 
 /* ---------- colour circles ---------- */
 
@@ -221,11 +228,12 @@ html, body {
   pointer-events: auto;
 }
 #controls button {
-  width: clamp(5rem, 24vw, 8rem);
+  width: clamp(5.5rem, 27vw, 9rem);
   aspect-ratio: 1;
   padding: 0;
-  border: 5px solid var(--white);
+  border: 9px solid #fff;
   border-radius: 50%;
+  background-clip: padding-box;
   cursor: pointer;
   transition: transform .18s var(--ease), box-shadow .25s var(--ease);
 }
