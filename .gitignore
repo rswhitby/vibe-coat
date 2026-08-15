@@ -1,3 +1,8 @@
 node_modules/
 .claude/
 CLAUDE.md
+
+# TouchDesigner incremental saves. These are ~7 MB each, don't delta
+# compress, and TD regenerates them locally. Only the working .toe in
+# Touchdesigner/ is tracked.
+Touchdesigner/Backup/
