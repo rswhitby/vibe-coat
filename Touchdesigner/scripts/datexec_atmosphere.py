@@ -1,42 +1,51 @@
 # datexec_atmosphere — DAT Execute  (new operator)
 #
-#   DAT parameter:  text1          <- the prompt that feeds StreamDiffusionTD
+#   DAT parameter:  null2          <- the composed prompt from the agent
 #   Monitor:        Table Change   (on)
-#                   Cell Change    (on, harmless if text1 is a Text DAT)
+#                   Cell Change    (on)
 #
 # Pushes the current composed prompt out over the same WebSocket the app
 # already uses. Phones display it under "Current atmosphere".
 #
-# text1 is used rather than null2 because it is the text actually driving
-# the image generation — so what visitors read matches what they see.
-# To source from the raw agent output instead, change SRC to op('null2').
+# SRC is whichever operator holds the finished prompt. Check with:
+#
+#   for n in ('text1','null1','null2'):
+#       d = op(n); print(n, d.isText, d.isTable, d.numRows, d.numCols)
+#       print(repr(d.text[:200]))
 
 import json
 
 WS  = op('websocket1')
-SRC = op('text1')
+SRC = op('null2')
 
 _last_sent = None
 
 
 def _current_prompt():
-    """Return the prompt as a string, whether SRC is a Text or Table DAT."""
-    try:
-        t = SRC.text
-        if t and t.strip():
-            return t.strip()
-    except Exception:
-        pass
+    """Return just the prompt, whether SRC is a Text DAT or a Table DAT.
 
-    # Table DAT: walk backwards for the last non-empty cell
+    Text and Table DATs need different handling and getting this wrong is
+    quiet rather than loud:
+
+      - Text DAT:  .text is the body. Reading it cell-by-cell would give
+                   you only the last line.
+      - Table DAT: .text is the WHOLE table dumped as tab-separated
+                   values — headers, user messages, everything. That
+                   looks like "the vibes" rather than the prompt.
+    """
     try:
+        if SRC.isText:
+            return SRC.text.strip()
+
+        # Table: last non-empty cell. The agent's reply is appended last,
+        # so this lands on the assistant message and skips any header.
         for r in range(SRC.numRows - 1, -1, -1):
             for c in range(SRC.numCols - 1, -1, -1):
                 v = SRC[r, c].val.strip()
                 if v:
                     return v
-    except Exception:
-        pass
+    except Exception as e:
+        debug('atmosphere: could not read', SRC.path, '—', e)
 
     return ''
 
