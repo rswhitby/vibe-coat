@@ -592,7 +592,7 @@ settingsBackdrop.addEventListener('click', closeSettings);
 //  Current Vibes — accumulated client-side
 // =====================================================================
 
-const MAX_VIBES = 12;
+const MAX_VIBES = 5;    // design shows five; relay retains more
 const latestVibes = [];
 const elLatest     = document.getElementById('latest-vibes');
 const elAtmosBlock = document.getElementById('atmosphere-block');

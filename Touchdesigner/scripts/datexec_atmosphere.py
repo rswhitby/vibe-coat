@@ -21,33 +21,24 @@ SRC = op('null2')
 _last_sent = None
 
 
+PROMPT_ROW = 1
+PROMPT_COL = 0
+
+
 def _current_prompt():
-    """Return just the prompt, whether SRC is a Text DAT or a Table DAT.
+    """The composed prompt lives in null2 row 1, col 0.
 
-    Text and Table DATs need different handling and getting this wrong is
-    quiet rather than loud:
-
-      - Text DAT:  .text is the body. Reading it cell-by-cell would give
-                   you only the last line.
-      - Table DAT: .text is the WHOLE table dumped as tab-separated
-                   values — headers, user messages, everything. That
-                   looks like "the vibes" rather than the prompt.
+    Read that cell directly. Do NOT use SRC.text on a Table DAT — it
+    returns the whole table as tab-separated values, header row and user
+    messages included, which is what was previously being sent.
     """
     try:
-        if SRC.isText:
-            return SRC.text.strip()
-
-        # Table: last non-empty cell. The agent's reply is appended last,
-        # so this lands on the assistant message and skips any header.
-        for r in range(SRC.numRows - 1, -1, -1):
-            for c in range(SRC.numCols - 1, -1, -1):
-                v = SRC[r, c].val.strip()
-                if v:
-                    return v
+        if SRC.numRows <= PROMPT_ROW:
+            return ''
+        return SRC[PROMPT_ROW, PROMPT_COL].val.strip()
     except Exception as e:
         debug('atmosphere: could not read', SRC.path, '—', e)
-
-    return ''
+        return ''
 
 
 def send_atmosphere():
