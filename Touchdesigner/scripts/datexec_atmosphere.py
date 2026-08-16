@@ -26,18 +26,53 @@ _last_sent = None
 
 
 def _current_prompt():
-    """The composed prompt lives in null2 row 1, col 0.
+    """Pull the composed prompt out of null2.
 
-    Read that cell directly. Do NOT use .text on a Table DAT — it returns
-    the whole table as tab-separated values, header row included.
+    Text and Table DATs are numbered differently in the TD viewer, which
+    is easy to misread:
+
+      - Table DAT (select1): first row is labelled 0
+      - Text DAT  (null2):   first LINE is labelled 1
+
+    So the prompt that displays as "1" in a Text DAT is index 0, and
+    reading [1,0] gets the empty second line. Handle both shapes instead
+    of assuming, and never use .text on a Table DAT — that returns the
+    whole table as tab-separated values, header row included.
     """
     try:
-        if PROMPT_SRC.numRows <= PROMPT_ROW:
-            return ''
-        return PROMPT_SRC[PROMPT_ROW, PROMPT_COL].val.strip()
+        if PROMPT_SRC.isText:
+            return PROMPT_SRC.text.strip()
+
+        # Table: preferred cell first, then fall back to scanning.
+        if PROMPT_SRC.numRows > PROMPT_ROW:
+            v = PROMPT_SRC[PROMPT_ROW, PROMPT_COL].val.strip()
+            if v:
+                return v
+
+        for r in range(PROMPT_SRC.numRows - 1, -1, -1):
+            for c in range(PROMPT_SRC.numCols - 1, -1, -1):
+                v = PROMPT_SRC[r, c].val.strip()
+                if v:
+                    return v
     except Exception as e:
         debug('atmosphere: could not read', PROMPT_SRC.path, '—', e)
-        return ''
+
+    return ''
+
+
+def probe():
+    """Run from the textport to see exactly what is being read:
+
+        op('datexec_atmosphere').module.probe()
+    """
+    d = PROMPT_SRC
+    print('operator :', d.path)
+    print('isText   :', d.isText, '| isTable:', d.isTable)
+    print('size     :', d.numRows, 'x', d.numCols)
+    print('prompt   :', repr(_current_prompt()[:160]))
+    print('vibes    :', _current_vibes())
+    print('ws active:', WS.par.active.eval())
+    return
 
 
 def _current_vibes():

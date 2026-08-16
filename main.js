@@ -618,8 +618,16 @@ function renderVibes() {
 
 function setAtmosphere(text) {
   text = String(text || '').trim();
-  if (!text) return;
+  if (!text) {
+    // Keep the heading visible with a placeholder. Hiding the whole block
+    // made "TouchDesigner sent nothing" look identical to "the app can't
+    // display this", which cost an evening.
+    elAtmosText.textContent = 'composing…';
+    elAtmosText.classList.add('muted');
+    return;
+  }
   elAtmosText.textContent = text;
+  elAtmosText.classList.remove('muted');
   elAtmosBlock.hidden = false;
 }
 
@@ -649,7 +657,7 @@ function connectWS() {
         });
         if (currentView === 'current') renderVibes();
       }
-      if (msg.atmosphere) setAtmosphere(msg.atmosphere);
+      setAtmosphere(msg.atmosphere);
       return;
     }
 
